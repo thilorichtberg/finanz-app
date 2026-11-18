@@ -460,14 +460,16 @@
     const per = Fin.period(today, settings.periodStart || 1);
     return fixed.filter((f) => !f.deleted && f.active !== false && f.kind === 'income').map((f) => {
       const plan = Math.abs(f.amount), m = Fin.fold(f.match || '').trim(), mine = txs.filter((t) => t.amount > 0 && !t.ignore && !t.autoIgnore && m && (t.hay || Fin.haystack(t)).includes(m));
-      const now = mine.filter((t) => t.date >= per.from && t.date <= per.to), actual = round2(now.reduce((s, t) => s + t.amount, 0));
-      const last = now.length ? now.map((t) => t.date).sort().pop() : (mine.map((t) => t.date).sort().pop() || '');
       let due = per.from; for (let d = per.from; d <= per.to; d = Fin.addDays(d, 1)) if (dparse(d).getDate() === Math.min(f.day, daysInMonth(dparse(d).getFullYear(), dparse(d).getMonth()))) { due = d; break; }
+      // Der Eingang darf ± tol Tage um den üblichen Tag liegen, auch über die Monatsgrenze (zum Beispiel Tag 1 ± 2: 30. bis 3.)
+      const tol = Math.max(0, Math.min(15, Number(f.tol == null ? 3 : f.tol))), wFrom = Fin.addDays(due, -tol), wTo = Fin.addDays(due, tol);
+      const now = mine.filter((t) => t.date >= wFrom && t.date <= wTo), actual = round2(now.reduce((s, t) => s + t.amount, 0));
+      const last = now.length ? now.map((t) => t.date).sort().pop() : (mine.map((t) => t.date).sort().pop() || '');
       let status = 'ok';
       if (!m || !mine.length) status = 'unknown';        // noch nie eine passende Zahlung gesehen: Eingang lässt sich nicht prüfen, kein falscher Alarm
-      else if (actual === 0) status = today > Fin.addDays(due, 7) ? 'late' : 'pending';
+      else if (actual === 0) status = today > wTo ? 'late' : 'pending';
       else if (Math.abs(actual - plan) > plan * 0.05) status = 'diff';
-      return { id: f.id, name: f.name, plan, actual, diff: round2(actual - plan), last, due, status };
+      return { id: f.id, name: f.name, plan, actual, diff: round2(actual - plan), last, due, tol, status };
     });
   };
   // Warnungen für den Reiter „Warnungen“ (Einstellungen): Fixkosten über dem angegebenen Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets

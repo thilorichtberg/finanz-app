@@ -147,6 +147,15 @@ t('Wiederkehrend: Nachzahlung über zwei Monate (43 €, dann 86 € nach zwei M
   const rec = Fin.detectRecurring([mk('2026-09-01', -43), mk('2026-11-02', -86)]);
   assert.equal(rec.length, 1); assert.equal(rec[0].amount, -43);
 });
+t('Einkommen mit Toleranz: Tag 1 ± 2 nimmt eine Zahlung vom 30. des Vormonats, zu früh oder zu spät fällt heraus', () => {
+  const dad = (d, a = 590) => ({ date: d, amount: a, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'einkommen' });
+  const fixed = [{ id: 'f', kind: 'income', name: 'Unterhalt', amount: 590, day: 1, tol: 2, active: true, match: 'richtberg martin' }];
+  const run = (txs, today) => Fin.incomeCheck({ txs, fixed, settings: {}, today })[0];
+  assert.equal(run([dad('2026-10-01'), dad('2026-10-30')], '2026-11-18').status, 'ok');         // 30.10. liegt im Fenster 30.10.–3.11.
+  assert.equal(run([dad('2026-10-01'), dad('2026-10-28')], '2026-11-18').status, 'late');       // zu früh: gehört nicht zu November
+  assert.equal(run([dad('2026-10-01')], '2026-11-03').status, 'pending'); assert.equal(run([dad('2026-10-01')], '2026-11-04').status, 'late');
+  assert.equal(run([dad('2026-10-01'), dad('2026-11-03', 500)], '2026-11-18').status, 'diff');
+});
 t('Rückblick: letzter Budgetzeitraum, Summen, Top-Kategorien, gehalten oder nicht', () => {
   const txs = [{ date: '2026-10-05', amount: -100, cat: 'lebensmittel' }, { date: '2026-10-06', amount: -50, cat: 'essen' }, { date: '2026-10-07', amount: 600, cat: 'einkommen' },
     { date: '2026-10-08', amount: -999, cat: 'umbuchung' }, { date: '2026-09-10', amount: -30, cat: 'lebensmittel' }];

@@ -31,7 +31,7 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     await page.setInputFiles('#csv-file', csv); await page.waitForSelector('#sheet[open]'); await check('import-fertig'); await page.click('#sheet [data-sheet-close].btn');
     // 2. Einkommen + Fixposten anlegen
     await nav('#/neu/einkommen', 'form-einkommen');
-    await page.fill('#f-name', 'Zuschuss Dad'); await page.fill('#f-amount', '590'); await page.fill('#f-day', '30'); await page.fill('#f-match', 'richtberg martin'); await page.click('.gform [type=submit]'); await page.waitForSelector('.kv');
+    await page.fill('#f-name', 'Zuschuss Dad'); await page.fill('#f-amount', '590'); await page.fill('#f-day', '30'); await page.fill('#f-tol', '2'); await page.fill('#f-match', 'richtberg martin'); await page.click('.gform [type=submit]'); await page.waitForSelector('.kv');
     await nav('#/neu/fix', 'form-fix2'); await page.click('.gform [type=submit]'); // leer: Fehler
     if (!(await page.textContent('#e-name')).includes('Bitte')) bad(`${tag} Formularfehler fehlt`);
     // Beispiel-Abbuchung wählen: Entwurf bleibt erhalten, Erkennung wird vorbelegt
