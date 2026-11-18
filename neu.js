@@ -18,7 +18,7 @@ function groupedTxHtml(list) {
   return html;
 }
 VIEWS_NEU.heute = (r) => {
-  const range = ['tag', 'woche', 'monat'].includes(r.a) ? r.a : 'tag';
+  const range = ['tag', 'woche', 'monat'].includes(r.a) ? r.a : 'monat';
   const d = derived(), st = settings(), t = todayKey(), off = ui.bo[range];
   const V = Fin.rangeView({ txs: d.txs, cats: d.cats, fixed: live('fixed'), planned: d.planned, settings: st, today: t }, range, off);
   const hasPlan = V.b.income > 0, left = V.left, spent = V.spent, budgetV = V.limit, p = pct(spent, budgetV), past = !V.current;
@@ -48,7 +48,7 @@ VIEWS_NEU.heute = (r) => {
   const list = d.txs.filter((x) => x.date >= V.from && x.date <= V.to);
   const sub = range === 'tag' ? dateLong(V.from) : range === 'woche' ? `Woche ${dateShort(V.from)} – ${dateShort(V.to)}` : periodShort(V.from, V.to);
   return `<div class="view-wrap">${pageHead('Budget', { sub: dateLong(t) })}
-    ${seg([{ id: 'tag', label: 'Tag', href: '#/heute/tag' }, { id: 'woche', label: 'Woche', href: '#/heute/woche' }, { id: 'monat', label: 'Monat', href: '#/heute/monat' }], range, 'Zeitraum')}
+    ${seg([{ id: 'monat', label: 'Monat', href: '#/heute/monat' }, { id: 'woche', label: 'Woche', href: '#/heute/woche' }, { id: 'tag', label: 'Tag', href: '#/heute/tag' }], range, 'Zeitraum')}
     ${nav}${hero}
     <section class="section" style="margin-top:0"><h2>Einnahmen und Ausgaben</h2><p class="hint-line">${esc(sub)}</p>${groupedTxHtml(list)}</section></div>`;
 };

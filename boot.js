@@ -114,9 +114,9 @@ document.addEventListener('click', (e) => {
       else announce(act === 'warn-hide' ? 'Warnung ausgeblendet' : 'Warnung eingeblendet');
       render({ force: true }); break;
     }
-    case 'budget-info': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; openSheet(budgetSheetHtml(rg, ui.bo[rg]), el); break; }
-    case 'bnav': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; ui.bo[rg] = Math.min(0, ui.bo[rg] + Number(k)); render({ force: true }); break; }
-    case 'bnow': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; ui.bo[rg] = 0; render({ force: true }); break; }
+    case 'budget-info': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'monat'; openSheet(budgetSheetHtml(rg, ui.bo[rg]), el); break; }
+    case 'bnav': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'monat'; ui.bo[rg] = Math.min(0, ui.bo[rg] + Number(k)); render({ force: true }); break; }
+    case 'bnow': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'monat'; ui.bo[rg] = 0; render({ force: true }); break; }
     case 'rb': ui.rb = Math.max(1, ui.rb + Number(k)); render({ force: true }); announce(`${dateShort(Fin.review({ txs: derived().txs, cats: derived().cats, fixed: live('fixed'), settings: settings(), today: todayKey() }, ui.rb).from)}`); break;
     case 'fix-adjust': {
       const f = get('fixed', id); if (!f) break;
