@@ -283,7 +283,7 @@ function parseRoute() {
   const p = h.split('/').filter(Boolean).map(decodeURIComponent);
   return { name: p[0] || 'heute', a: p[1] || '', b: p[2] || '', path: p };
 }
-const tabOf = (r) => ({ heute: 'heute', umsaetze: 'umsaetze', tx: 'umsaetze', kategorie: 'umsaetze', neu: r.b ? (['geplant', 'fix', 'einkommen', 'ziel', 'einzahlung'].includes(r.a) ? 'plan' : 'einstellungen') : 'neu', zuordnen: 'heute', rueckblick: 'heute', beispiel: 'plan', plan: 'plan', einstellungen: 'einstellungen' }[r.name] || 'heute');
+const tabOf = (r) => ({ heute: 'heute', umsaetze: 'umsaetze', tx: 'umsaetze', kategorie: 'umsaetze', neu: r.b ? (['geplant', 'fix', 'einkommen', 'ziel', 'einzahlung'].includes(r.a) ? 'plan' : 'einstellungen') : 'neu', zuordnen: 'heute', rueckblick: 'heute', beispiel: r.a === 'regel' ? 'einstellungen' : 'plan', plan: 'plan', einstellungen: 'einstellungen' }[r.name] || 'heute');
 let lastRouteKey = '', draft = null;
 function render(opts = {}) {
   const r = parseRoute(), key = location.hash;

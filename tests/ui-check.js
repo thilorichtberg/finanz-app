@@ -75,6 +75,12 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     if (!(await page.isDisabled('[data-act=bnow]'))) bad(`${tag} Jetzt-Knopf bei aktuellem Zeitraum nicht deaktiviert`);
     await nav('#/heute/monat', 'budget-monat'); await page.click('[data-act=bnav][data-k="-1"]'); await page.waitForTimeout(100); await check('budget-monat-zurueck'); await page.click('[data-act=bnow]');
     await nav('#/heute/tag', 'budget-tag');
+    // Eigene Regel mit Beispiel-Umsatz
+    await nav('#/neu/regel', 'form-regel'); await page.click('[data-act=open-picker]'); await page.waitForSelector('#pklist .tx'); await check('beispiel-wahl-regel');
+    await page.click('#pklist .tx'); await page.waitForSelector('#f-example', { state: 'attached' }); await check('form-regel-mit-beispiel');
+    if (!(await page.inputValue('#f-example'))) bad(`${tag} Regel: Beispiel nicht übernommen`);
+    if (!(await page.inputValue('#f-text')).trim()) bad(`${tag} Regel: Suchtext nicht vorbelegt`);
+    await page.selectOption('#f-cat', 'essen'); await page.click('.gform [type=submit]'); await page.waitForTimeout(250);
     // Alt-Ansicht: Schalter oben in der Mitte, andere Symbole unten
     await page.click('[data-mode=alt]'); await page.waitForTimeout(150);
     for (const r of ['heute/tag', 'umsaetze', 'plan', 'plan/fix', 'einstellungen']) await nav('#/' + r, 'alt-' + r.replace('/', '-'));

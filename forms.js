@@ -125,13 +125,13 @@ const FORM_DEFS = {
       save: (v) => { put('goal', Object.assign(it || { id: uid('go') }, { name: v.name, target: v.target, saved: v.saved })); return { to: '#/plan/ziele', msg: 'Sparziel gespeichert' }; } }; },
   regel: (id) => { const it = id ? get('rule', id) : null; if (id && !it) return null;
     return { title: it ? 'Eigene Regel' : 'Neue Regel', back: '#/einstellungen/regeln', intro: 'Trifft eine Regel zu, bekommt der Umsatz diese Kategorie. Eigene Regeln gehen vor den festen. Die neueste Regel gewinnt.',
-      values: it ? { field: it.field, text: it.text, sign: it.sign || '', cat: it.cat, min: it.min ?? '', max: it.max ?? '' } : { field: 'all', sign: 'out', cat: 'sonstiges' },
-      fields: [{ n: 'field', t: 'select', l: 'Suchen in', o: [['all', 'Name und Verwendungszweck'], ['name', 'Nur Name (Zahlungsbeteiligter)'], ['purpose', 'Nur Verwendungszweck'], ['iban', 'IBAN des Zahlungsbeteiligten']] },
+      values: it ? { example: (it.example || {}).id || '', field: it.field, text: it.text, sign: it.sign || '', cat: it.cat, min: it.min ?? '', max: it.max ?? '' } : { field: 'all', sign: 'out', cat: 'sonstiges' },
+      fields: [{ n: 'example', t: 'example', l: 'Beispiel-Umsatz', opt: true, hint: 'Wähle einen Umsatz, den die Regel treffen soll. „Enthält“ und „Gilt für“ werden daraus vorbelegt.' }, { n: 'field', t: 'select', l: 'Suchen in', o: [['all', 'Name und Verwendungszweck'], ['name', 'Nur Name (Zahlungsbeteiligter)'], ['purpose', 'Nur Verwendungszweck'], ['iban', 'IBAN des Zahlungsbeteiligten']] },
         { n: 'text', t: 'text', l: 'Enthält', ph: 'zum Beispiel Cleverfit', max: 80 }, { n: 'sign', t: 'select', l: 'Gilt für', o: [['out', 'Nur Ausgaben'], ['in', 'Nur Einnahmen'], ['', 'Ausgaben und Einnahmen']] },
         { n: 'cat', t: 'select', l: 'Kategorie', o: derived().cats.map((c) => [c.id, c.name]) },
         { n: 'min', t: 'money', l: 'Betrag ab', opt: true, zero: true }, { n: 'max', t: 'money', l: 'Betrag bis', opt: true, zero: true }],
       del: it ? { kind: 'rule', label: 'Regel löschen' } : null,
-      save: (v) => { put('rule', Object.assign(it || { id: uid('ru') }, { field: v.field, text: v.text, sign: v.sign, cat: v.cat, min: v.min === '' ? null : v.min, max: v.max === '' ? null : v.max })); return { to: '#/einstellungen/regeln', msg: 'Regel gespeichert und angewendet' }; } }; },
+      save: (v) => { put('rule', Object.assign(it || { id: uid('ru') }, { field: v.field, text: v.text, sign: v.sign, cat: v.cat, min: v.min === '' ? null : v.min, max: v.max === '' ? null : v.max, example: exampleOf(v.example, it) })); return { to: '#/einstellungen/regeln', msg: 'Regel gespeichert und angewendet' }; } }; },
   kategorie: (id) => { const c = id ? derived().cats.find((x) => x.id === id) : null; if (id && !c) return null; const own = c && !c.builtin;
     return { title: c ? c.name : 'Neue Kategorie', back: c ? `#/kategorie/${c.id}` : '#/einstellungen/kategorien',
       intro: c && c.builtin ? 'Feste Kategorien lassen sich nicht umbenennen. Du kannst ein Monatsbudget setzen.' : '',

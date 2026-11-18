@@ -125,23 +125,28 @@ document.addEventListener('click', (e) => {
     case 'open-picker': {
       const form = el.closest('.gform'); if (!form) break;
       captureDraft(form); draftKeep = true;
-      go(`#/beispiel/${form.dataset.type === 'einkommen' ? 'einkommen' : 'fix'}/${form.dataset.id ? encodeURIComponent(form.dataset.id) : 'neu'}`); break;
+      go(`#/beispiel/${['einkommen', 'regel'].includes(form.dataset.type) ? form.dataset.type : 'fix'}/${form.dataset.id ? encodeURIComponent(form.dataset.id) : 'neu'}`); break;
     }
     case 'clear-example': {
       const form = el.closest('.gform'); if (!form) break;
       captureDraft(form); draft.vals.example = ''; render({ force: true }); break;
     }
     case 'pick-example': {
-      const r = parseRoute(), type = r.a === 'einkommen' ? 'einkommen' : 'fix', formId = r.b && r.b !== 'neu' ? r.b : '';
+      const r = parseRoute(), type = ['einkommen', 'regel'].includes(r.a) ? r.a : 'fix', formId = r.b && r.b !== 'neu' ? r.b : '';
       const t = derived().txs.find((x) => x.id === id); if (!t) break;
       if (!draft || draft.type !== type || draft.id !== formId) draft = { type, id: formId, vals: {} };
       const v = draft.vals; v.example = t.id;
-      if (!String(v.match || '').trim()) v.match = Fin.groupSeed(t) || t.name || '';
-      if (!String(v.name || '').trim()) v.name = t.title;
-      if (!String(v.amount || '').trim()) v.amount = String(Math.abs(t.amount)).replace('.', ',');
-      if (!v.day || v.day === '1') v.day = String(Number(t.date.slice(8, 10)));
-      if (v.active === undefined) v.active = true;
-      draftKeep = true; location.hash = `#/neu/${type === 'einkommen' ? 'einkommen' : 'fix'}${formId ? '/' + encodeURIComponent(formId) : ''}`; break;
+      if (type === 'regel') {                                    // Regel: Suchtext und Richtung kommen aus dem Beispiel
+        v.text = Fin.groupSeed(t) || t.name || Fin.cleanPurpose(t.purpose).slice(0, 40);
+        v.sign = t.amount < 0 ? 'out' : 'in'; if (!v.field) v.field = 'all'; if (!v.cat) v.cat = 'sonstiges';
+      } else {
+        if (!String(v.match || '').trim()) v.match = Fin.groupSeed(t) || t.name || '';
+        if (!String(v.name || '').trim()) v.name = t.title;
+        if (!String(v.amount || '').trim()) v.amount = String(Math.abs(t.amount)).replace('.', ',');
+        if (!v.day || v.day === '1') v.day = String(Number(t.date.slice(8, 10)));
+        if (v.active === undefined) v.active = true;
+      }
+      draftKeep = true; location.hash = `#/neu/${type}${formId ? '/' + encodeURIComponent(formId) : ''}`; break;
     }
     case 'sync-now': runSync(false); break;
     case 'signout': openSheet(`<div class="sheet-head"><h2 id="sheet-title">Abmelden</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
