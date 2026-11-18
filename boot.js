@@ -42,7 +42,7 @@ async function importCsvFile(file, fallback) {
   const note = [`${added} neue ${added === 1 ? 'Umsatz' : 'Umsätze'}`, dup ? `${dup} schon vorhanden` : '', res.skipped ? `${res.skipped} Zeilen übersprungen` : ''].filter(Boolean).join(', ');
   openSheet(`<div class="sheet-head"><h2 id="sheet-title">Import fertig</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
     <p class="sheet-text">${esc(note)}.</p><p class="sheet-text">${unsorted} ${unsorted === 1 ? 'Umsatz liegt' : 'Umsätze liegen'} unter „Sonstiges“. Dort kannst du Regeln anlegen.${d.suggestions.length ? ` ${d.suggestions.length} wiederkehrende Zahlungen habe ich erkannt.` : ''}</p>
-    <div class="sheet-actions"><button type="button" class="btn" data-sheet-close>Fertig</button><button type="button" class="btn ghost" id="imp-undo">Rückgängig</button>${d.suggestions.length ? '<a class="btn primary" href="#/plan/fix">Fixkosten ansehen</a>' : '<a class="btn primary" href="#/umsaetze">Umsätze ansehen</a>'}</div>`);
+    <div class="sheet-actions"><button type="button" class="btn" data-sheet-close>Fertig</button><button type="button" class="btn ghost" id="imp-undo">Rückgängig</button>${d.suggestions.length ? '<a class="btn primary" href="#/plan/fix">Fixkosten ansehen</a>' : '<a class="btn primary" href="#/umsaetze/verlauf">Umsätze ansehen</a>'}</div>`);
   $('#imp-undo').addEventListener('click', () => { addedIds.forEach((i) => remove('tx', i)); closeSheet(); toast(`Import rückgängig: ${addedIds.length} Umsätze entfernt`); render({ force: true }); });
   announce(note); render({ force: true });
 }
@@ -175,7 +175,7 @@ document.addEventListener('click', (e) => {
       const n = derived().txs.filter((x) => x.rule === rid).length;
       toast(`Regel gespeichert: ${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} zugeordnet`, undefined, { label: 'Rückgängig', run: () => { remove('rule', rid); render({ force: true }); } }); render({ force: true }); break;
     }
-    case 'del-tx': armDelete(el, () => { remove('tx', id); toast('Umsatz gelöscht', undefined, { label: 'Wiederherstellen', run: () => { restore('tx', id); render({ force: true }); } }); goBack('#/umsaetze'); }); break;
+    case 'del-tx': armDelete(el, () => { remove('tx', id); toast('Umsatz gelöscht', undefined, { label: 'Wiederherstellen', run: () => { restore('tx', id); render({ force: true }); } }); goBack('#/umsaetze/verlauf'); }); break;
     case 'del-item': armDelete(el, () => {
       const kind = el.dataset.k, back = el.dataset.back || '#/heute', it = S[kind][id], name = it ? (it.name || it.text || 'Eintrag') : 'Eintrag';
       remove(kind, id); draft = null;

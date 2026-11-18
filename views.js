@@ -134,9 +134,9 @@ function txListHtml() {
   if (all.length > list.length) html += `<button type="button" class="btn block more" data-act="more">Mehr anzeigen (${all.length - list.length})</button>`;
   return html;
 }
-const UM_SEG = (cur) => seg([{ id: 'liste', label: 'Liste', href: '#/umsaetze' }, { id: 'kategorien', label: 'Kategorien', href: '#/umsaetze/kategorien' }, { id: 'berichte', label: 'Berichte', href: '#/umsaetze/berichte' }], cur, 'Ansicht');
+const UM_SEG = (cur) => seg([{ id: 'kategorien', label: 'Kategorien', href: '#/umsaetze' }, { id: 'berichte', label: 'Berichte', href: '#/umsaetze/berichte' }, { id: 'liste', label: 'Verlauf', href: '#/umsaetze/verlauf' }], cur, 'Ansicht');
 VIEWS.umsaetze = (r) => {
-  const sub = r.a === 'kategorien' ? 'kategorien' : r.a === 'berichte' ? 'berichte' : 'liste';
+  const sub = r.a === 'berichte' ? 'berichte' : (r.a === 'verlauf' || r.a === 'liste') ? 'liste' : 'kategorien';       // Kategorien ist die Startseite der Übersicht
   if (sub === 'kategorien') return umKategorien();
   if (sub === 'berichte') return umBerichte();
   const accts = live('acct');
@@ -211,13 +211,13 @@ function umBerichte() {
 /* ---------- Umsatz-Details und Zuordnung ---------- */
 VIEWS.tx = (r) => {
   const d = derived(), t = d.txs.find((x) => x.id === r.a);
-  if (!t) return pageHead('Umsatz', { back: '#/umsaetze' }) + emptyBlock('Nicht gefunden', 'Diesen Umsatz gibt es nicht mehr.', '<a class="btn" href="#/umsaetze">Zur Liste</a>');
+  if (!t) return pageHead('Umsatz', { back: '#/umsaetze/verlauf' }) + emptyBlock('Nicht gefunden', 'Diesen Umsatz gibt es nicht mehr.', '<a class="btn" href="#/umsaetze/verlauf">Zum Verlauf</a>');
   const c = d.cmap.get(t.cat) || catById(t.cat), acct = get('acct', t.acct);
   const by = { manual: 'von dir gewählt', user: 'eigene Regel', builtin: 'feste Regel', recurring: 'als wiederkehrend erkannt', none: 'nicht zugeordnet' }[t.by] || '';
   const groups = [['Ausgaben', d.cats.filter((x) => x.kind === 'expense')], ['Einnahmen', d.cats.filter((x) => x.kind === 'income' || x.kind === 'refund')], ['Ohne Wirkung', d.cats.filter((x) => x.kind === 'transfer')]];
   const catSel = groups.map(([g, l]) => `<optgroup label="${g}">${l.map((x) => `<option value="${esc(x.id)}"${x.id === t.cat ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>`).join('');
   const seed = /paypal/i.test(t.name) ? (Fin.paypalMerchant(t.purpose) || t.name) : t.name;
-  return `<div class="view-wrap">${pageHead(t.title, { back: '#/umsaetze', backLabel: 'Zurück zu Umsätzen' })}
+  return `<div class="view-wrap">${pageHead(t.title, { back: '#/umsaetze/verlauf', backLabel: 'Zurück zum Verlauf' })}
     <section class="hero" style="padding-top:0"><div class="cap">${esc(dateLong(t.date))}</div><div class="big ${t.amount > 0 ? '' : ''}" style="${t.amount > 0 ? 'color:var(--accent)' : ''}">${signed(t.amount)}</div><div class="sub"><span>${esc(c.name)} · ${esc(by)}</span></div></section>
     <dl class="kv" style="margin-bottom:var(--s4)">${t.name ? `<div><dt>Name</dt><dd>${esc(t.name)}</dd></div>` : ''}${acct ? `<div><dt>Konto</dt><dd>${esc(acct.name)}</dd></div>` : ''}${t.type ? `<div><dt>Art</dt><dd>${esc(t.type)}</dd></div>` : ''}</dl>
     ${t.purpose ? `<section class="section" style="margin-top:0"><h2>Verwendungszweck</h2><p class="hint-line" style="overflow-wrap:anywhere">${esc(Fin.cleanPurpose(t.purpose))}</p></section>` : ''}

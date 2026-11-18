@@ -41,9 +41,9 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     if ((await page.inputValue('#f-name')) !== 'Strom') bad(`${tag} Entwurf (Name) ging verloren`);
     if (!(await page.inputValue('#f-match')).trim()) bad(`${tag} Erkennungstext nicht vorbelegt`);
     await page.fill('#f-amount', '1,5'); await page.fill('#f-day', '3'); await page.click('.gform [type=submit]');
-    for (const r of ['heute/tag', 'heute/woche', 'heute/monat', 'umsaetze', 'umsaetze/kategorien', 'umsaetze/berichte', 'plan', 'plan/geplant', 'plan/ziele', 'zuordnen', 'rueckblick', 'neu', 'neu/ausgabe', 'neu/einnahme', 'neu/geplant', 'neu/einkommen', 'neu/ziel', 'neu/regel', 'einstellungen', 'einstellungen/konto', 'einstellungen/warnungen', 'einstellungen/bank', 'einstellungen/konten', 'einstellungen/regeln', 'einstellungen/kategorien', 'einstellungen/budget']) await nav('#/' + r, r.replace('/', '-'));
+    for (const r of ['heute/tag', 'heute/woche', 'heute/monat', 'umsaetze', 'umsaetze/verlauf', 'umsaetze/berichte', 'plan', 'plan/geplant', 'plan/ziele', 'zuordnen', 'rueckblick', 'neu', 'neu/ausgabe', 'neu/einnahme', 'neu/geplant', 'neu/einkommen', 'neu/ziel', 'neu/regel', 'einstellungen', 'einstellungen/konto', 'einstellungen/warnungen', 'einstellungen/bank', 'einstellungen/konten', 'einstellungen/regeln', 'einstellungen/kategorien', 'einstellungen/budget']) await nav('#/' + r, r.replace('/', '-'));
     // 3. Umsatz öffnen, Regel anlegen
-    await nav('#/umsaetze', 'liste'); await page.fill('#q', 'dad'); await page.waitForTimeout(60); await page.click('#txlist a.tx');
+    await nav('#/umsaetze/verlauf', 'verlauf'); await page.fill('#q', 'dad'); await page.waitForTimeout(60); await page.click('#txlist a.tx');
     await page.waitForSelector('#tx-form'); await check('tx-detail'); await page.selectOption('#f-cat', 'einkommen'); await page.check('#f-rule'); await check('tx-regel'); await page.click('#tx-form [type=submit]');
     await page.waitForSelector('#txlist'); await nav('#/einstellungen/regeln', 'regeln-nach'); if (!(await page.textContent('#view')).includes('Einkommen')) bad(`${tag} Regel nicht in der Liste`);
     // 3b. Zuordnen: Regel für eine Gruppe merken

@@ -250,7 +250,7 @@ const TABS = [
   { id: 'umsaetze', label: 'Übersicht', icon: 'pie', href: '#/umsaetze' },
   { id: 'neu', label: 'Neu', icon: 'plus', href: '#/neu', main: true },
   { id: 'plan', label: 'Plan', icon: 'calclock', href: '#/plan' },
-  { id: 'einstellungen', label: 'Einstellungen', icon: 'sliders', href: '#/einstellungen' },
+  { id: 'einstellungen', label: 'Einstellungen', icon: 'gear', href: '#/einstellungen' },
 ];
 let firstTab = true;
 $('#tabbar').innerHTML = `<div class="tabbar-in"><span class="tab-indicator" aria-hidden="true"></span>${TABS.map((t) =>

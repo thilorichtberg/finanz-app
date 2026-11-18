@@ -9,15 +9,23 @@ VIEWS.neu = (r) => {
   if (r.a === 'fix' && r.b && (get('fixed', r.b) || {}).kind === 'income') return renderForm('einkommen', r.b);
   if (r.a && FORM_DEFS[r.a]) return renderForm(r.a, r.b);
   const tile = (href, ic, name, meta, primary) => `<a class="tile ${primary ? 'primary' : ''}" href="${href}"><span class="ic-wrap">${icon(ic)}</span><span class="info"><span class="name">${name}</span><br><span class="meta">${meta}</span></span>${icon('right')}</a>`;
-  return `<div class="view-wrap">${pageHead('Neu')}<div class="tiles">
-    ${tile('#/neu/ausgabe', 'minus', 'Ausgabe erfassen', 'Barzahlung oder etwas, das nicht im Bankexport steht', true)}
-    ${tile('#/neu/einnahme', 'plus', 'Einnahme erfassen', 'Einmalige Einnahme')}
-    ${tile('#/neu/geplant', 'calendar', 'Geplante Zahlung', 'Zum Beispiel PayPal oder Klarna in 30 Tagen')}
-    ${tile('#/neu/fix', 'repeat', 'Fixkosten', 'Miete, Abo, Versicherung: jeden Monat gleich')}
-    ${tile('#/neu/einkommen', 'trend', 'Regelmäßiges Einkommen', 'Zum Beispiel Gehalt oder Unterhalt')}
-    ${tile('#/neu/ziel', 'target', 'Sparziel', 'Ein Betrag, auf den du hinsparst')}
-    ${tile('#/neu/regel', 'tag', 'Eigene Regel', 'Bestimmte Umsätze immer einer Kategorie zuordnen')}
-    <button type="button" class="tile" data-act="import-csv"><span class="ic-wrap">${icon('upload')}</span><span class="info"><span class="name">CSV importieren</span><br><span class="meta">Umsatz-Export deiner Bank</span></span>${icon('right')}</button></div></div>`;
+  const csv = `<button type="button" class="btn small csv-btn" data-act="import-csv">${icon('upload')}CSV importieren</button>`;
+  return `<div class="view-wrap">${pageHead('Neu', { actions: csv })}
+    <div class="tile-groups">
+      <section class="tiles" aria-label="Ausgaben">
+        ${tile('#/neu/ausgabe', 'minus', 'Ausgabe erfassen', 'Barzahlung oder etwas, das nicht im Bankexport steht', true)}
+        ${tile('#/neu/geplant', 'calendar', 'Geplante Zahlung', 'Zum Beispiel PayPal oder Klarna in 30 Tagen')}
+        ${tile('#/neu/fix', 'repeat', 'Fixkosten', 'Miete, Abo, Versicherung: jeden Monat gleich')}
+      </section>
+      <section class="tiles" aria-label="Einnahmen">
+        ${tile('#/neu/einnahme', 'plus', 'Einnahme erfassen', 'Einmalige Einnahme')}
+        ${tile('#/neu/einkommen', 'trend', 'Regelmäßiges Einkommen', 'Zum Beispiel Gehalt oder Unterhalt')}
+      </section>
+      <section class="tiles" aria-label="Weiteres">
+        ${tile('#/neu/regel', 'tag', 'Regel erstellen', 'Bestimmte Umsätze immer einer Kategorie zuordnen')}
+        ${tile('#/neu/ziel', 'target', 'Sparziel', 'Ein Betrag, auf den du hinsparst')}
+      </section>
+    </div></div>`;
 };
 
 /* ---------- Formular-Baukasten ---------- */
@@ -93,7 +101,7 @@ const FORM_DEFS = {
   einnahme: () => ({ title: 'Einnahme erfassen', back: '#/neu', submit: 'Einnahme speichern', values: { date: todayStr(), acct: (live('acct')[0] || {}).id || '' },
     fields: [{ n: 'amount', t: 'money', l: 'Betrag' }, { n: 'name', t: 'text', l: 'Von wem?', ph: 'zum Beispiel Verkauf', max: 80 }, { n: 'date', t: 'date', l: 'Datum' },
       { n: 'cat', t: 'select', l: 'Kategorie', o: [['', 'Automatisch zuordnen'], ...catOpts(['income', 'refund'])] }, ...(live('acct').length ? [{ n: 'acct', t: 'select', l: 'Konto', o: accOpts() }] : [])],
-    save: (v) => { put('tx', { id: uid('tx_m'), acct: v.acct || '', date: v.date, amount: v.amount, name: v.name, purpose: '', type: 'Manuell', iban: '', manualEntry: true, manual: v.cat || undefined }); return { to: '#/umsaetze', msg: `Einnahme über ${eur(v.amount)} gespeichert` }; } }),
+    save: (v) => { put('tx', { id: uid('tx_m'), acct: v.acct || '', date: v.date, amount: v.amount, name: v.name, purpose: '', type: 'Manuell', iban: '', manualEntry: true, manual: v.cat || undefined }); return { to: '#/umsaetze/verlauf', msg: `Einnahme über ${eur(v.amount)} gespeichert` }; } }),
   geplant: (id) => { const it = id ? get('planned', id) : null; if (id && !it) return null;
     return { title: it ? 'Geplante Zahlung' : 'Zahlung planen', back: '#/plan/geplant', intro: 'Wird nur bei dir gespeichert, es wird nichts bezahlt. Ab dem Monat der Fälligkeit mindert sie das Budget, vorher steht sie unter „Als Nächstes fällig“. Kommt der passende Umsatz, hakt die App sie selbst ab.',
       values: it ? { name: it.name, amount: Math.abs(it.amount), due: it.due, note: it.note || '' } : { due: Fin.addDays(todayStr(), 30) },
@@ -124,7 +132,7 @@ const FORM_DEFS = {
       del: it ? { kind: 'goal', label: 'Ziel löschen' } : null,
       save: (v) => { put('goal', Object.assign(it || { id: uid('go') }, { name: v.name, target: v.target, saved: v.saved })); return { to: '#/plan/ziele', msg: 'Sparziel gespeichert' }; } }; },
   regel: (id) => { const it = id ? get('rule', id) : null; if (id && !it) return null;
-    return { title: it ? 'Eigene Regel' : 'Neue Regel', back: '#/einstellungen/regeln', intro: 'Trifft eine Regel zu, bekommt der Umsatz diese Kategorie. Eigene Regeln gehen vor den festen. Die neueste Regel gewinnt.',
+    return { title: it ? 'Regel' : 'Regel erstellen', back: '#/einstellungen/regeln', intro: 'Trifft eine Regel zu, bekommt der Umsatz diese Kategorie. Eigene Regeln gehen vor den festen. Die neueste Regel gewinnt.',
       values: it ? { example: (it.example || {}).id || '', field: it.field, text: it.text, sign: it.sign || '', cat: it.cat, min: it.min ?? '', max: it.max ?? '' } : { field: 'all', sign: 'out', cat: 'sonstiges' },
       fields: [{ n: 'example', t: 'example', l: 'Beispiel-Umsatz', opt: true, hint: 'Wähle einen Umsatz, den die Regel treffen soll. „Enthält“ und „Gilt für“ werden daraus vorbelegt.' }, { n: 'field', t: 'select', l: 'Suchen in', o: [['all', 'Name und Verwendungszweck'], ['name', 'Nur Name (Zahlungsbeteiligter)'], ['purpose', 'Nur Verwendungszweck'], ['iban', 'IBAN des Zahlungsbeteiligten']] },
         { n: 'text', t: 'text', l: 'Enthält', ph: 'zum Beispiel Cleverfit', max: 80 }, { n: 'sign', t: 'select', l: 'Gilt für', o: [['out', 'Nur Ausgaben'], ['in', 'Nur Einnahmen'], ['', 'Ausgaben und Einnahmen']] },
@@ -190,7 +198,7 @@ function submitTx(form) {
   btn.disabled = true; btn.textContent = 'Speichern …';
   t.ignore = ignore; put('tx', t);
   const n = rule ? derived().txs.filter((x) => x.rule === ruleId).length : 0;
-  toast(rule ? `Regel gespeichert, ${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} zugeordnet` : 'Gespeichert'); goBack('#/umsaetze');
+  toast(rule ? `Regel gespeichert, ${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} zugeordnet` : 'Gespeichert'); goBack('#/umsaetze/verlauf');
 }
 
 /* ---------- Plan ---------- */

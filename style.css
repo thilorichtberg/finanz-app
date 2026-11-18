@@ -488,6 +488,8 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 #sheet .kv { margin: var(--s2) 0; } #sheet .kv .hint { font-weight: 400; color: var(--muted); font-size: .8125rem; }
 .warn-card { display: grid; gap: var(--s2); padding-bottom: var(--s2); }
 .warn-card .btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); padding: 0 var(--s1); }
+.tile-groups { display: grid; gap: var(--s5); }
+.csv-btn { font-size: .875rem; gap: 6px; padding: 0 var(--s3); } .csv-btn .ic { width: 18px; height: 18px; }
 .bnav { gap: var(--s1); }
 .bnav .m { font-size: 1rem; min-width: 0; overflow-wrap: anywhere; }
 .bnav .btn.small { flex: none; min-width: 64px; }
