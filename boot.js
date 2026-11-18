@@ -102,7 +102,21 @@ document.addEventListener('click', (e) => {
     case 'filter': ui.filter = k; ui.limit = 60; ui.filterOpen = false; render({ force: true }); break;
     case 'filter-toggle': { ui.filterOpen = !ui.filterOpen; const m = $('#filter-menu'); if (m) m.hidden = !ui.filterOpen; el.setAttribute('aria-expanded', String(ui.filterOpen)); if (ui.filterOpen && m) { const f = m.querySelector('[aria-checked="true"]') || m.querySelector('.menu-item'); if (f) f.focus(); } break; }
     case 'acct': ui.acct = k; ui.limit = 60; ui.filterOpen = false; render({ force: true }); break;
-    case 'fix-more': ui.fixMore = !ui.fixMore; render({ force: true }); break;
+    case 'fix-more': {
+      ui.fixMore = !ui.fixMore; const pk = $('#fix-peek'); if (!pk) { render({ force: true }); break; }
+      const list = pk.querySelector('.list-block'), label = el.querySelector('span');
+      el.setAttribute('aria-expanded', String(ui.fixMore));
+      label.textContent = ui.fixMore ? 'Weniger anzeigen' : `Mehr anzeigen (${list.children.length})`;
+      if (ui.fixMore) {                                      // aufklappen: von 46 px auf die volle Höhe gleiten, der Verlauf blendet aus
+        list.inert = false; pk.removeAttribute('aria-hidden'); pk.classList.add('open'); pk.style.maxHeight = pk.scrollHeight + 'px';
+        const done = (ev) => { if (ev && ev.propertyName !== 'max-height') return; pk.style.maxHeight = 'none'; pk.removeEventListener('transitionend', done); };
+        if (noMotion()) done(); else pk.addEventListener('transitionend', done);
+      } else {                                               // zuklappen: zurück auf den angeschnittenen Rand, Verlauf blendet ein
+        pk.style.maxHeight = pk.scrollHeight + 'px'; void pk.offsetHeight; pk.classList.remove('open'); pk.style.maxHeight = '';
+        list.inert = true; pk.setAttribute('aria-hidden', 'true');
+      }
+      break;
+    }
     case 'clear-filter': ui.filter = 'alle'; ui.q = ''; ui.acct = ''; ui.limit = 60; render({ force: true }); break;
     case 'more': ui.limit += 60; $('#txlist').innerHTML = txListHtml(); break;
     case 'import-csv': $('#csv-file').click(); break;
@@ -192,6 +206,23 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('input', (e) => { if (e.target.id === 'pq') { ui.pq = e.target.value; $('#pklist').innerHTML = pickListHtml(); return; } if (e.target.id === 'q') { ui.q = e.target.value; ui.limit = 60; $('#txlist').innerHTML = txListHtml(); } });
+
+/* ---------- Einklappbare Bereiche (details.fold) gleiten auf und zu statt zu springen ---------- */
+document.addEventListener('click', (e) => {
+  const sum = e.target.closest('details.fold > summary'); if (!sum) return;
+  const d = sum.parentElement; e.preventDefault();
+  let body = d.querySelector(':scope > .fold-body');
+  if (!body) { body = document.createElement('div'); body.className = 'fold-body'; [...d.children].filter((c) => c !== sum).forEach((c) => body.append(c)); d.append(body); }
+  if (noMotion()) { d.open = !d.open; return; }
+  const finish = (cb) => { const end = (ev) => { if (ev.propertyName !== 'height') return; body.removeEventListener('transitionend', end); body.style.cssText = ''; cb(); }; body.addEventListener('transitionend', end); };
+  if (!d.open) {
+    d.open = true; body.style.height = '0px'; body.style.opacity = '0'; void body.offsetHeight;
+    body.style.height = body.scrollHeight + 'px'; body.style.opacity = '1'; finish(() => {});
+  } else {
+    d.classList.add('closing'); body.style.height = body.scrollHeight + 'px'; void body.offsetHeight;
+    body.style.height = '0px'; body.style.opacity = '0'; finish(() => { d.open = false; d.classList.remove('closing'); });
+  }
+});
 
 /* ---------- Torte: Kategorie antippen ---------- */
 function pieSelect(path) {

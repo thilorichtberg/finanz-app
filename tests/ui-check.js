@@ -70,8 +70,8 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     for (const nm of ['Fix A', 'Fix B', 'Fix C', 'Fix D']) { await nav('#/neu/fix', 'form-fix-x'); await page.fill('#f-name', nm); await page.fill('#f-amount', '10'); await page.fill('#f-day', '5'); await page.click('.gform [type=submit]'); await page.waitForTimeout(150); }
     await nav('#/plan', 'plan-fix-mehr');
     if ((await page.$$eval('.list-block .tx', (e) => e.length)) < 1) bad(`${tag} Plan zeigt keine Fixkosten`);
-    if (!(await page.$('.tease'))) bad(`${tag} angeschnittene nächste Fixkosten-Karte fehlt`);
-    const mehr = await page.$('[data-act=fix-more]'); if (!mehr) bad(`${tag} „Mehr anzeigen“ fehlt bei mehr als 3 Fixkosten`); else { await mehr.click(); await page.waitForTimeout(80); await check('plan-fix-alle'); await page.click('[data-act=fix-more]'); }
+    if (!(await page.$('#fix-peek'))) bad(`${tag} angeschnittene nächste Fixkosten-Karte fehlt`);
+    const mehr = await page.$('[data-act=fix-more]'); if (!mehr) bad(`${tag} „Mehr anzeigen“ fehlt bei mehr als 3 Fixkosten`); else { await mehr.click(); await page.waitForTimeout(450); await check('plan-fix-alle'); if ((await page.$eval('#fix-peek', (e) => e.style.maxHeight)) !== 'none') bad(`${tag} Mehr anzeigen: Höhe nach dem Aufklappen nicht frei`); await page.click('[data-act=fix-more]'); await page.waitForTimeout(450); if ((await page.$eval('#fix-peek', (e) => e.getBoundingClientRect().height)) > 60) bad(`${tag} Weniger anzeigen klappt nicht zu`); }
     // Torte: Antippen zeigt den Namen; Zurück-Verhalten (Übersicht → Kategorien → Kategorie → Umsatz → zurück / speichern)
     await nav('#/umsaetze/kategorien', 'torte-start');
     const sliceName = await page.getAttribute('.pie .slice', 'data-name'); await page.click('.pie .slice');
@@ -105,7 +105,7 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
       const n0 = await page.$$eval('.warn-card', (c) => c.length);
       await page.click('[data-act=warn-hide]'); await page.waitForTimeout(100);
       if (!(await page.textContent('#warn-hidden summary')).includes('(1)')) bad(`${tag} Ausgeblendet-Zähler zeigt nicht 1`);
-      await page.click('#warn-hidden summary'); await page.waitForTimeout(100); await check('warn-ausgeblendet');
+      await page.click('#warn-hidden summary'); await page.waitForTimeout(450); await check('warn-ausgeblendet');
       await page.click('[data-act=warn-show]'); await page.waitForTimeout(100);
       if ((await page.$$eval('.warn-card', (c) => c.length)) !== n0) bad(`${tag} Einblenden stellt die Warnung nicht wieder her`);
       await page.click('[data-act=warn-del]'); await page.waitForTimeout(100);

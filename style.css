@@ -509,8 +509,11 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 .menu-item .ic { width: 18px; height: 18px; flex: none; }
 @media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
 /* „Mehr anzeigen“: Textknopf (nicht wie ein Knopf zum Eintragen) und die nächste Karte schaut angeschnitten mit Verlauf hervor */
-.tease { position: relative; max-height: 46px; overflow: hidden; pointer-events: none; margin-top: calc(-1 * var(--s1)); }
-.tease::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 0%, var(--bg) 95%); }
+.peek { position: relative; overflow: hidden; max-height: 46px; margin-top: calc(-1 * var(--s1)); transition: max-height var(--t-med) var(--ease); }
+.peek-fade { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 0%, var(--bg) 95%); pointer-events: none; opacity: 1; transition: opacity var(--t-med) var(--ease); }
+.peek.open { margin-top: 0; } .peek.open .peek-fade { opacity: 0; }
+.fold-body { overflow: hidden; transition: height var(--t-med) var(--ease), opacity var(--t-med) var(--ease); }
+.fold.closing .chev { transform: none; }
 .linkbtn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--accent); font-weight: 700; }
 .linkbtn .ic { width: 18px; height: 18px; transform: rotate(90deg); transition: transform var(--t-fast) var(--ease); }
 .linkbtn[aria-expanded="true"] .ic { transform: rotate(-90deg); }
