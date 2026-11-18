@@ -325,6 +325,7 @@ html:has(.form-page) { scroll-padding-bottom: calc(var(--tabbar-h) + 104px + env
 .amt.over, .over-text { color: var(--danger); }
 .over-text { font-weight: 700; }
 .warn-text { color: var(--warn); font-weight: 700; }
+.meta.warn-text, .meta.over-text { font-weight: 600; }
 .page-head .titles h1 { overflow-wrap: anywhere; }
 .page-head.left { margin-bottom: var(--s4); }
 .page-head .back { min-width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; color: var(--text); text-decoration: none; border-radius: 50%; margin-left: -10px; }

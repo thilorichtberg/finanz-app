@@ -3,7 +3,7 @@
    Finanzen – Ansichten: Heute, Umsätze, Kategorien, Berichte, Umsatz-Details
    ===================================================================== */
 
-const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '' };
+const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1 };
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const MON_S = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const monthLabel = (mk) => `${MONTHS[Number(mk.slice(5)) - 1]} ${mk.slice(0, 4)}`;
@@ -75,6 +75,9 @@ VIEWS.heute = (r) => {
     return { c, sp, p: pct(sp, c.budget) };
   }).filter((x) => x.p >= st.warnAt).sort((a, c) => c.p - a.p);
   const bankNote = bankStatus();
+  const rv = Fin.review({ txs: d.txs, cats: d.cats, fixed: live('fixed'), settings: st, today: t }), recent = (Fin.dparse(t) - Fin.dparse(b.from)) / 864e5 <= 2 && rv.hasData;
+  const rvText = rv.hasData ? `${dateShort(rv.from)} – ${dateShort(rv.to)}: ${eur(rv.spent)} ausgegeben, ${rv.disposable <= 0 ? 'kein Budget geplant' : rv.kept ? 'Budget gehalten' : 'Budget überschritten'}` : 'Noch keine Umsätze im letzten Budgetmonat';
+  const incNote = incomeNote(d, st, t);
   const unsorted = d.txs.filter((x) => x.cat === 'sonstiges' && !x.ignore).length;
   const accts = live('acct').filter((a) => a.balance != null);
   return `<div class="view-wrap">
@@ -88,7 +91,9 @@ VIEWS.heute = (r) => {
       <p class="hint-line">Prognose bei gleichem Tempo: ${eur(b.forecast)} bis Monatsende${b.disposable > 0 ? (b.forecast > b.disposable ? ', das wären ' + eur(b.forecast - b.disposable) + ' zu viel.' : ', das passt ins Budget.') : '.'}</p></section>
     <section class="section"><h2>Heute gebucht</h2>${todays.length ? `<div class="list-block">${todays.map((x) => txRow(x)).join('')}</div>` : `<p class="hint-line">Heute noch keine Umsätze.</p>`}</section>
     <section class="section"><h2>Als Nächstes fällig</h2>${upcoming.length ? `<div class="list-block">${upcoming.map((u) => `<a class="tx" href="#/neu/${u.k === 'planned' ? 'geplant' : 'fix'}/${encodeURIComponent(u.id)}"><span class="cat-ic">${icon(u.k === 'planned' ? 'calendar' : 'repeat')}</span><span class="info"><span class="name">${esc(u.name)}</span><br><span class="meta">${relDays(u.date)} · ${dateShort(u.date)}${u.k === 'fix' ? ' · Fixkosten' : ''}</span></span>${amt(u.amount)}</a>`).join('')}</div>` : `<p class="hint-line">In den nächsten Tagen ist nichts fällig.</p>`}</section>
-    <section class="section"><h2>Aufräumen</h2><div class="list-block">
+    <section class="section"><h2>Hinweise</h2><div class="list-block">
+      <a class="row-link-card" href="#/rueckblick"><span class="info"><span class="name">Rückblick ${recent ? '<span class="badge ok">Neu</span>' : ''}</span><br><span class="meta ${rv.hasData && !rv.kept && rv.disposable > 0 ? 'warn-text' : ''}">${esc(rvText)}</span></span>${icon('right')}</a>
+      <a class="row-link-card" href="#/plan/fix"><span class="info"><span class="name">Einkommen</span><br><span class="meta ${incNote.cls}">${esc(incNote.text)}</span></span>${icon('right')}</a>
       <a class="row-link-card" href="#/zuordnen"><span class="info"><span class="name">Sonstiges zuordnen</span><br><span class="meta">${unsorted ? unsorted + (unsorted === 1 ? ' Umsatz wartet' : ' Umsätze warten') : 'Alles zugeordnet'}</span></span>${icon('right')}</a>
       <a class="row-link-card" href="#/plan/fix"><span class="info"><span class="name">Wiederkehrende Zahlungen</span><br><span class="meta">${d.suggestions.length ? d.suggestions.length + ' erkannt, als Fixposten übernehmen' : 'Keine neuen erkannt'}</span></span>${icon('right')}</a>
       <a class="row-link-card" href="#/einstellungen/bank"><span class="info"><span class="name">Bank-Freigabe</span><br><span class="meta ${bankNote.cls}">${esc(bankNote.text)}</span></span>${icon('right')}</a>
@@ -256,3 +261,39 @@ function bankStatus() {
   if (min <= 7) return { text: `Freigabe läuft in ${min} ${min === 1 ? 'Tag' : 'Tagen'} ab, bitte erneuern`, cls: 'warn-text' };
   return { text: min >= 999 ? 'Verbunden' : `Verbunden, Freigabe noch ${min} Tage`, cls: '' };
 }
+
+/* Kurztext zur Gehalt-Abweichung für Heute: schlimmster Fall zuerst */
+function incomeNote(d, st, t) {
+  const list = Fin.incomeCheck({ txs: d.txs, fixed: live('fixed'), settings: st, today: t });
+  if (!list.length) return { text: 'Kein Einkommen geplant', cls: '' };
+  const pick = (s) => list.find((x) => x.status === s);
+  let x;
+  if ((x = pick('late'))) return { text: `${x.name}: noch nicht eingegangen (erwartet am ${dateShort(x.due)})`, cls: 'warn-text' };
+  if ((x = pick('diff'))) return { text: `${x.name}: ${eur(x.actual)} statt ${eur(x.plan)} eingegangen`, cls: 'warn-text' };
+  if ((x = pick('pending'))) return { text: `${x.name}: erwartet am ${dateShort(x.due)}`, cls: '' };
+  if (list.every((y) => y.status === 'unknown')) return { text: 'Eingang nicht prüfbar: noch keine passende Zahlung gefunden', cls: '' };
+  return { text: 'Wie geplant eingegangen', cls: '' };
+}
+
+/* ---------- Rückblick auf vergangene Budgetmonate ---------- */
+VIEWS.rueckblick = () => {
+  const d = derived(), st = settings(), t = todayKey();
+  const r = Fin.review({ txs: d.txs, cats: d.cats, fixed: live('fixed'), settings: st, today: t }, ui.rb);
+  const nav = `<div class="monthnav"><button type="button" class="icon-btn" data-act="rb" data-k="1" aria-label="Früherer Budgetmonat">${icon('left')}</button>
+    <div class="m" aria-live="polite">${esc(dateShort(r.from))} – ${esc(dateShort(r.to))} ${esc(r.to.slice(0, 4))}</div>
+    <button type="button" class="icon-btn" data-act="rb" data-k="-1" aria-label="Späterer Budgetmonat"${ui.rb <= 1 ? ' disabled' : ''}>${icon('right')}</button></div>`;
+  const head = pageHead('Rückblick', { back: '#/heute', backLabel: 'Zurück zu Heute', sub: ui.rb === 1 ? 'Letzter Budgetmonat' : `${ui.rb} Budgetmonate zurück` });
+  if (!r.hasData) return `<div class="view-wrap">${head}${nav}${emptyBlock('Keine Umsätze', 'In diesem Budgetmonat gibt es keine Umsätze. Blättere weiter zurück.', '')}</div>`;
+  const hasB = r.disposable > 0, state = !hasB ? `<span class="state">${icon('info')}Kein Budget geplant</span>` : r.kept ? `<span class="state ok">${icon('check')}Budget gehalten</span>` : `<span class="state bad">${icon('alert')}Budget um ${eur(-r.left)} überschritten</span>`;
+  const dExp = r.expense - r.prevExpense;
+  const top = r.top.map((x) => { const c = d.cmap.get(x.id) || catById(x.id), dv = x.total - x.prev; return `<a class="catrow" href="#/kategorie/${esc(x.id)}"><span class="top"><span class="cat-ic">${icon(c.icon)}</span><span class="nm">${esc(c.name)}</span><span class="amt">${eur(x.total)}</span></span>
+    <span class="sub"><span>${x.share} % der Ausgaben</span><span>${x.prev ? (dv === 0 ? 'wie davor' : (dv > 0 ? '+' : '−') + eur(Math.abs(dv)) + ' zum Zeitraum davor') : 'davor nichts'}</span></span></a>`; }).join('');
+  return `<div class="view-wrap">${head}${nav}
+    <section class="hero"><div class="cap">${hasB ? (r.left >= 0 ? 'Übrig geblieben' : 'Überschritten') : 'Variabel ausgegeben'}</div><div class="big ${hasB && r.left < 0 ? 'over' : ''}">${eur(hasB ? r.left : r.spent)}</div>
+      <div class="sub"><span>Budget ${hasB ? eur(r.disposable) : '–'}</span><span>Ausgegeben ${eur(r.spent)}</span></div>${meterHtml(r.spent, hasB ? r.disposable : 0, st.warnAt)}${state}</section>
+    <dl class="kv"><div><dt>Einnahmen</dt><dd>${eur(r.income)}</dd></div><div><dt>Ausgaben gesamt</dt><dd>${eur(r.expense)}</dd></div>
+      <div class="total"><dt class="k">Gespart</dt><dd class="${r.net < 0 ? 'over-text' : ''}">${signed(r.net)}${r.saveRate != null ? ` (${r.saveRate} %)` : ''}</dd></div>
+      <div><dt>Ausgaben zum Zeitraum davor</dt><dd>${r.prevExpense ? (dExp === 0 ? 'gleich' : (dExp > 0 ? '+' : '−') + eur(Math.abs(dExp))) : 'kein Vergleich'}</dd></div></dl>
+    <section class="section"><h2>Die größten Ausgaben</h2>${top ? `<div class="list-block">${top}</div>` : '<p class="hint-line">Keine Ausgaben.</p>'}</section>
+    <p class="hint-line" style="margin-top:var(--s4)">Das Budget rechnet mit deinen heutigen Fixposten. Umbuchungen zählen nicht mit.</p></div>`;
+};

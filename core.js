@@ -410,6 +410,46 @@
       return { month: mk, income: round2(inc), expense: round2(exp), net: round2(inc - exp) };
     });
   };
+  // Summen für einen beliebigen Zeitraum (ohne Umbuchungen; Erstattungen mindern die Ausgaben)
+  Fin.rangeTotals = (txs, cats, from, to) => {
+    const cmap = Fin.catMap(cats); let inc = 0, exp = 0;
+    for (const t of txs) {
+      if (t.date < from || t.date > to || t.ignore || t.autoIgnore) continue;
+      const c = cmap.get(t.cat) || { kind: t.amount < 0 ? 'expense' : 'income' };
+      if (c.kind === 'transfer') continue;
+      if (c.kind === 'refund') exp -= t.amount; else if (t.amount > 0) inc += t.amount; else exp -= t.amount;
+    }
+    return { income: round2(inc), expense: round2(exp), net: round2(inc - exp) };
+  };
+  // Rückblick auf einen vergangenen Budgetzeitraum (back = 1: der letzte abgeschlossene)
+  Fin.review = ({ txs, cats, fixed = [], settings = {}, today }, back = 1) => {
+    const sd = settings.periodStart || 1; let per = Fin.period(today, sd);
+    for (let i = 0; i < back; i++) per = Fin.period(Fin.addDays(per.from, -1), sd);
+    const before = Fin.period(Fin.addDays(per.from, -1), sd);
+    const t = Fin.rangeTotals(txs, cats, per.from, per.to), tp = Fin.rangeTotals(txs, cats, before.from, before.to);
+    const b = Fin.budget({ txs, cats, fixed, planned: [], settings, today: per.to });
+    const cur = Fin.byCategory(txs, cats, per.from, per.to), prev = new Map(Fin.byCategory(txs, cats, before.from, before.to).map((x) => [x.id, x.total]));
+    const total = cur.reduce((s, x) => s + x.total, 0);
+    return { from: per.from, to: per.to, before, hasData: t.income > 0 || t.expense > 0, income: t.income, expense: t.expense, net: t.net, saveRate: t.income > 0 ? Math.round((t.net / t.income) * 100) : null,
+      prevExpense: tp.expense, planIncome: b.income, fixed: b.fixed, disposable: b.disposable, spent: b.month.spent, left: b.month.left, kept: b.month.left >= 0 && b.disposable > 0,
+      top: cur.slice(0, 3).map((x) => ({ id: x.id, total: x.total, share: total > 0 ? Math.round((x.total / total) * 100) : 0, prev: prev.get(x.id) || 0 })) };
+  };
+  // Gehalt-Abweichung: Was ist von jedem geplanten Einkommen im aktuellen Budgetzeitraum eingegangen?
+  // status: ok | pending (noch nicht fällig) | late (mehr als 7 Tage über dem Termin) | diff (Betrag weicht um mehr als 5 % ab)
+  Fin.incomeCheck = ({ txs, fixed = [], settings = {}, today }) => {
+    const per = Fin.period(today, settings.periodStart || 1);
+    return fixed.filter((f) => !f.deleted && f.active !== false && f.kind === 'income').map((f) => {
+      const plan = Math.abs(f.amount), mine = txs.filter((t) => t.amount > 0 && !t.ignore && !t.autoIgnore && f.key && (t.mkey || Fin.merchantKey(t)) === f.key);
+      const now = mine.filter((t) => t.date >= per.from && t.date <= per.to), actual = round2(now.reduce((s, t) => s + t.amount, 0));
+      const last = now.length ? now.map((t) => t.date).sort().pop() : (mine.map((t) => t.date).sort().pop() || '');
+      let due = per.from; for (let d = per.from; d <= per.to; d = Fin.addDays(d, 1)) if (dparse(d).getDate() === Math.min(f.day, daysInMonth(dparse(d).getFullYear(), dparse(d).getMonth()))) { due = d; break; }
+      let status = 'ok';
+      if (!f.key || !mine.length) status = 'unknown';        // noch nie eine passende Zahlung gesehen: Eingang lässt sich nicht prüfen, kein falscher Alarm
+      else if (actual === 0) status = today > Fin.addDays(due, 7) ? 'late' : 'pending';
+      else if (Math.abs(actual - plan) > plan * 0.05) status = 'diff';
+      return { id: f.id, name: f.name, plan, actual, diff: round2(actual - plan), last, due, status };
+    });
+  };
   // Nächste Fälligkeit eines Fixpostens (Tag im Monat, auf Monatsende gekürzt)
   Fin.nextDue = (day, today) => {
     const d = dparse(today); let y = d.getFullYear(), m = d.getMonth();

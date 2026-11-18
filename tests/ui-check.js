@@ -35,7 +35,7 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     await nav('#/neu/fix', 'form-fix2'); await page.click('.gform [type=submit]'); // leer: Fehler
     if (!(await page.textContent('#e-name')).includes('Bitte')) bad(`${tag} Formularfehler fehlt`);
     await page.fill('#f-name', 'Miete'); await page.fill('#f-amount', '1,5'); await page.fill('#f-day', '3'); await page.click('.gform [type=submit]');
-    for (const r of ['heute/tag', 'heute/woche', 'heute/monat', 'umsaetze', 'umsaetze/kategorien', 'umsaetze/berichte', 'plan', 'plan/fix', 'plan/ziele', 'zuordnen', 'neu', 'neu/ausgabe', 'neu/einnahme', 'neu/geplant', 'neu/ziel', 'neu/regel', 'einstellungen', 'einstellungen/konto', 'einstellungen/bank', 'einstellungen/konten', 'einstellungen/regeln', 'einstellungen/kategorien', 'einstellungen/budget']) await nav('#/' + r, r.replace('/', '-'));
+    for (const r of ['heute/tag', 'heute/woche', 'heute/monat', 'umsaetze', 'umsaetze/kategorien', 'umsaetze/berichte', 'plan', 'plan/fix', 'plan/ziele', 'zuordnen', 'rueckblick', 'neu', 'neu/ausgabe', 'neu/einnahme', 'neu/geplant', 'neu/ziel', 'neu/regel', 'einstellungen', 'einstellungen/konto', 'einstellungen/bank', 'einstellungen/konten', 'einstellungen/regeln', 'einstellungen/kategorien', 'einstellungen/budget']) await nav('#/' + r, r.replace('/', '-'));
     // 3. Umsatz öffnen, Regel anlegen
     await nav('#/umsaetze', 'liste'); await page.fill('#q', 'dad'); await page.waitForTimeout(60); await page.click('#txlist a.tx');
     await page.waitForSelector('#tx-form'); await check('tx-detail'); await page.selectOption('#f-cat', 'einkommen'); await page.check('#f-rule'); await check('tx-regel'); await page.click('#tx-form [type=submit]');

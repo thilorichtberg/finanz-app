@@ -14,6 +14,7 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 - **Budget pro Kategorie** mit Warnung ab 80 %, **Sparziele**, **mehrere Konten**, **Umbuchungen** zählen nicht als Ausgabe
 - **Budgetmonat ab Tag X** (zum Beispiel 30, wenn der Unterhalt um den 30. kommt) unter Einstellungen → Budget
 - **Bank-Anbindung** über Enable Banking (Edge Function `bank-sync`): Abruf von Hand (Knopf oben rechts, mit Rückfrage) und täglich automatisch um 06:00/07:00 Uhr (`supabase/bank-cron.sql`). PSD2 erlaubt automatische Abrufe nur 4-mal pro Tag und Bank. Die Freigabe läuft nach einigen Wochen ab, die App warnt 7 Tage vorher
+- **Rückblick** auf vergangene Budgetmonate (Einnahmen, Gespart, größte Ausgaben, Budget gehalten oder nicht) und **Gehalt-Abweichung**: Die App prüft, ob dein geplantes Einkommen im Budgetmonat eingegangen ist, und bietet bei anderem Betrag „Plan anpassen“ an
 - **Berichte:** Monatsvergleich, Ausgaben nach Händler, Export als CSV
 - **Local-first:** Die App arbeitet immer lokal und gleicht angemeldet mit Supabase ab (pro Eintrag gewinnt die jüngere Änderung)
 

@@ -100,6 +100,13 @@ document.addEventListener('click', (e) => {
       callBank('banks', { query: bankUI.q }).then((r) => { bankUI.busy = ''; if (r.ok) bankUI.banks = r.banks; else bankUI.err = r.message || 'Suche fehlgeschlagen.'; render({ force: true }); }); break; }
     case 'bank-start': { bankUI.busy = 'start'; render({ force: true });
       callBank('start', { bank: k }).then((r) => { if (r.ok && r.url) { location.href = r.url; return; } bankUI.busy = ''; bankUI.err = r.message || 'Verbindung konnte nicht gestartet werden.'; render({ force: true }); }); break; }
+    case 'rb': ui.rb = Math.max(1, ui.rb + Number(k)); render({ force: true }); announce(`${dateShort(Fin.review({ txs: derived().txs, cats: derived().cats, fixed: live('fixed'), settings: settings(), today: todayKey() }, ui.rb).from)}`); break;
+    case 'fix-adjust': {
+      const f = get('fixed', id); if (!f) break;
+      const c = Fin.incomeCheck({ txs: derived().txs, fixed: [f], settings: settings(), today: todayKey() })[0]; if (!c || !c.actual) break;
+      const old = f.amount; put('fixed', Object.assign({}, f, { amount: c.actual }));
+      toast(`Plan für „${f.name}“ auf ${eur(c.actual)} angepasst`, undefined, { label: 'Rückgängig', run: () => { put('fixed', Object.assign({}, get('fixed', id), { amount: old })); render({ force: true }); } }); render({ force: true }); break;
+    }
     case 'bank-sync': bankSync(); break;
     case 'tx-to-fixed': {
       const t = derived().txs.find((x) => x.id === id); if (!t) break;

@@ -165,5 +165,24 @@ t('Wiederkehrend: Nachzahlung über zwei Monate (43 €, dann 86 € nach zwei M
   const rec = Fin.detectRecurring([mk('2026-09-01', -43), mk('2026-11-02', -86)]);
   assert.equal(rec.length, 1); assert.equal(rec[0].amount, -43);
 });
+t('Gehalt-Abweichung: ok, abweichend, ausstehend, überfällig, Teilzahlungen werden summiert', () => {
+  const dad = (d, a) => ({ date: d, amount: a, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'einkommen' }), key = Fin.merchantKey(dad('x', 1));
+  const fixed = [{ id: 'f', kind: 'income', name: 'Unterhalt', amount: 590, day: 30, active: true, key }], st = { periodStart: 30 };
+  const run = (txs, today) => Fin.incomeCheck({ txs, fixed, settings: st, today })[0];
+  assert.equal(run([dad('2026-10-30', 590)], '2026-11-18').status, 'ok');
+  assert.equal(run([dad('2026-10-30', 520)], '2026-11-18').status, 'diff'); assert.equal(run([dad('2026-10-30', 520)], '2026-11-18').diff, -70);
+  assert.equal(run([dad('2026-10-30', 300), dad('2026-11-02', 290)], '2026-11-18').status, 'ok');          // zwei Teilzahlungen
+  const alt = [dad('2026-09-30', 590)];
+  assert.equal(run(alt, '2026-11-02').status, 'pending'); assert.equal(run(alt, '2026-11-18').status, 'late'); assert.equal(run([], '2026-11-18').status, 'unknown');
+  assert.equal(Fin.incomeCheck({ txs: [], fixed: [{ kind: 'income', amount: 100, day: 1 }], settings: {}, today: '2026-11-18' })[0].status, 'unknown');
+});
+t('Rückblick: letzter Budgetzeitraum, Summen, Top-Kategorien, gehalten oder nicht', () => {
+  const txs = [{ date: '2026-10-05', amount: -100, cat: 'lebensmittel' }, { date: '2026-10-06', amount: -50, cat: 'essen' }, { date: '2026-10-07', amount: 600, cat: 'einkommen' },
+    { date: '2026-10-08', amount: -999, cat: 'umbuchung' }, { date: '2026-09-10', amount: -30, cat: 'lebensmittel' }];
+  const r = Fin.review({ txs, cats, fixed: [{ kind: 'income', amount: 500, active: true }], settings: {}, today: '2026-11-18' });
+  assert.equal(r.from, '2026-10-01'); assert.equal(r.to, '2026-10-31'); assert.equal(r.income, 600); assert.equal(r.expense, 150); assert.equal(r.net, 450); assert.equal(r.saveRate, 75);
+  assert.equal(r.spent, 150); assert.equal(r.kept, true); assert.equal(r.top[0].id, 'lebensmittel'); assert.equal(r.top[0].prev, 30); assert.equal(r.prevExpense, 30);
+  assert.equal(Fin.review({ txs, cats, fixed: [{ kind: 'income', amount: 100, active: true }], settings: {}, today: '2026-11-18' }).kept, false);
+});
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);
