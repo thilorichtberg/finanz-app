@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
       const session = await eb('POST', '/sessions', { code });
       const accounts = (session.accounts || []).map((a: any) => ({ uid: a.uid, iban: a.account_id?.iban || '', name: a.name || a.product || '' }));
       const validUntil = session.access?.valid_until || null;
-      await db.from('fin_bank_links').update({ status: 'active', state: null, session_id: session.session_id, accounts, valid_until: validUntil, error: null }).eq('id', link.id);
+      const upd = await db.from('fin_bank_links').update({ status: 'active', state: null, session_id: session.session_id, accounts, valid_until: validUntil, error: null }).eq('id', link.id);
+      if (upd.error) return back(false, 'Speichern fehlgeschlagen');
       return back(true);
     }
 
@@ -109,7 +110,8 @@ Deno.serve(async (req) => {
       const maxSec = Math.min(aspsp.maximum_consent_validity || 90 * 86400, 180 * 86400);
       const state = crypto.randomUUID();
       const auth = await eb('POST', '/auth', { access: { valid_until: new Date(Date.now() + (maxSec - 3600) * 1000).toISOString() }, aspsp: { name: aspsp.name, country: aspsp.country }, state, redirect_url: Deno.env.get('BANK_REDIRECT_URL'), psu_type: 'personal' });
-      await db.from('fin_bank_links').insert({ user_id: userId, institution: aspsp.name, country: aspsp.country, state });
+      const ins = await db.from('fin_bank_links').insert({ user_id: userId, institution: aspsp.name, country: aspsp.country, state });
+      if (ins.error) throw new Error('Verbindung konnte nicht gespeichert werden: ' + ins.error.message);
       return json(req, { ok: true, url: auth.url });
     }
     if (input.action === 'sync') {

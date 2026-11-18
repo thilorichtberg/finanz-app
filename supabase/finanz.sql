@@ -39,3 +39,6 @@ create policy fin_items_select on public.fin_items for select to authenticated u
 create policy fin_items_insert on public.fin_items for insert to authenticated with check (user_id = (select auth.uid()));
 create policy fin_items_update on public.fin_items for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 create policy fin_items_delete on public.fin_items for delete to authenticated using (user_id = (select auth.uid()));
+
+-- Die Bank-Funktion (service_role) schreibt Umsätze in diese Tabelle
+grant select, insert, update, delete on public.fin_items to service_role;

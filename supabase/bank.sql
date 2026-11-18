@@ -23,3 +23,7 @@ create index if not exists fin_bank_links_user on public.fin_bank_links (user_id
 alter table public.fin_bank_links enable row level security;
 revoke all on public.fin_bank_links from anon, authenticated;
 -- bewusst keine Policy und kein grant: nur service_role (Edge Function) kommt heran.
+
+-- Die Edge Function arbeitet als service_role. Weil neue Tabellen nicht automatisch freigegeben werden, ausdrücklich erlauben:
+grant select, insert, update, delete on public.fin_bank_links to service_role;
+grant select, insert, update, delete on public.fin_items to service_role;
