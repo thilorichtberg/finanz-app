@@ -58,15 +58,19 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     const big = await page.textContent('.hero .big'); console.log(tag, 'Heute übrig:', big.trim());
     // Verlauf: Filter hinter dem Knopf; Fixkosten ab 3 hinter „Mehr anzeigen“
     await nav('#/umsaetze/verlauf', 'verlauf-filter-zu');
-    if (!(await page.isHidden('#filters-panel'))) bad(`${tag} Filter sind nicht versteckt`);
-    await page.click('[data-act=filter-toggle]'); await page.waitForTimeout(80); await check('verlauf-filter-offen');
-    if (await page.isHidden('#filters-panel')) bad(`${tag} Filter-Knopf öffnet die Filter nicht`);
-    await page.click('[data-act=filter][data-k=ausgaben]'); await page.waitForTimeout(80);
-    if (await page.isHidden('#filters-panel')) bad(`${tag} Filter schließen sich beim Wählen`);
-    await page.click('[data-act=clear-filter]').catch(() => {}); await page.click('[data-act=filter][data-k=alle]'); await page.click('[data-act=filter-toggle]');
+    if (!(await page.isHidden('#filter-menu'))) bad(`${tag} Filter-Menü ist offen, obwohl es zu sein sollte`);
+    await page.click('[data-act=filter-toggle]'); await page.waitForTimeout(120); await check('verlauf-filter-menue');
+    if (await page.isHidden('#filter-menu')) bad(`${tag} Filter-Knopf öffnet das Menü nicht`);
+    await page.click('[data-act=filter][data-k=ausgaben]'); await page.waitForTimeout(120);
+    if (!(await page.isHidden('#filter-menu'))) bad(`${tag} Menü schließt sich nach der Auswahl nicht`);
+    if (!(await page.textContent('.filter-btn .count')).trim()) bad(`${tag} Filter-Zähler fehlt`);
+    await page.click('[data-act=filter-toggle]'); await page.keyboard.press('Escape'); await page.waitForTimeout(80);
+    if (!(await page.isHidden('#filter-menu'))) bad(`${tag} Escape schließt das Menü nicht`);
+    await page.click('[data-act=filter-toggle]'); await page.click('[data-act=filter][data-k=alle]'); await page.waitForTimeout(80);
     for (const nm of ['Fix A', 'Fix B', 'Fix C', 'Fix D']) { await nav('#/neu/fix', 'form-fix-x'); await page.fill('#f-name', nm); await page.fill('#f-amount', '10'); await page.fill('#f-day', '5'); await page.click('.gform [type=submit]'); await page.waitForTimeout(150); }
     await nav('#/plan', 'plan-fix-mehr');
     if ((await page.$$eval('.list-block .tx', (e) => e.length)) < 1) bad(`${tag} Plan zeigt keine Fixkosten`);
+    if (!(await page.$('.tease'))) bad(`${tag} angeschnittene nächste Fixkosten-Karte fehlt`);
     const mehr = await page.$('[data-act=fix-more]'); if (!mehr) bad(`${tag} „Mehr anzeigen“ fehlt bei mehr als 3 Fixkosten`); else { await mehr.click(); await page.waitForTimeout(80); await check('plan-fix-alle'); await page.click('[data-act=fix-more]'); }
     // Torte: Antippen zeigt den Namen; Zurück-Verhalten (Übersicht → Kategorien → Kategorie → Umsatz → zurück / speichern)
     await nav('#/umsaetze/kategorien', 'torte-start');

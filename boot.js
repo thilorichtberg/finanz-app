@@ -84,7 +84,12 @@ function armDelete(btn, run) {
 }
 
 /* ---------- Klicks ---------- */
+function closeFilterMenu(focusBtn) {
+  ui.filterOpen = false; const m = $('#filter-menu'), b = $('.filter-btn'); if (m) m.hidden = true; if (b) { b.setAttribute('aria-expanded', 'false'); if (focusBtn) b.focus(); }
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.filterOpen) { e.preventDefault(); closeFilterMenu(true); } });
 document.addEventListener('click', (e) => {
+  if (ui.filterOpen && !e.target.closest('.menu-wrap')) closeFilterMenu(false);
   const back = e.target.closest('.page-head .back');          // Zurück-Pfeil: zur Seite davor, die feste Adresse gilt nur als Ersatz
   if (back && navStack.length > 1) { e.preventDefault(); history.back(); return; }
   const sl = e.target.closest('.pie .slice');                 // Torte: Antippen zeigt den Namen der Kategorie
@@ -94,8 +99,9 @@ document.addEventListener('click', (e) => {
   const act = el.dataset.act, id = el.dataset.id, k = el.dataset.k;
   switch (act) {
     case 'month': ui.month = shiftMonth(ui.month, Number(k)); render({ force: true }); announce(monthLabel(ui.month)); break;
-    case 'filter': ui.filter = k; ui.limit = 60; render({ force: true }); break;
-    case 'filter-toggle': { ui.filterOpen = !ui.filterOpen; const panel = $('#filters-panel'); if (panel) panel.hidden = !ui.filterOpen; el.setAttribute('aria-expanded', String(ui.filterOpen)); break; }
+    case 'filter': ui.filter = k; ui.limit = 60; ui.filterOpen = false; render({ force: true }); break;
+    case 'filter-toggle': { ui.filterOpen = !ui.filterOpen; const m = $('#filter-menu'); if (m) m.hidden = !ui.filterOpen; el.setAttribute('aria-expanded', String(ui.filterOpen)); if (ui.filterOpen && m) { const f = m.querySelector('[aria-checked="true"]') || m.querySelector('.menu-item'); if (f) f.focus(); } break; }
+    case 'acct': ui.acct = k; ui.limit = 60; ui.filterOpen = false; render({ force: true }); break;
     case 'fix-more': ui.fixMore = !ui.fixMore; render({ force: true }); break;
     case 'clear-filter': ui.filter = 'alle'; ui.q = ''; ui.acct = ''; ui.limit = 60; render({ force: true }); break;
     case 'more': ui.limit += 60; $('#txlist').innerHTML = txListHtml(); break;

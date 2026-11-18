@@ -496,8 +496,24 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 .filter-btn { position: relative; border: 1.5px solid var(--border); background: var(--surface); border-radius: var(--r-sm); width: 48px; height: 48px; flex: none; }
 .filter-btn[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .filter-btn .count { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .75rem; font-weight: 700; display: grid; place-items: center; }
-#filters-panel { display: grid; gap: var(--s3); margin-bottom: var(--s3); }
-#filters-panel[hidden] { display: none; }
+.menu-wrap { position: relative; flex: none; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 224px; max-width: calc(100vw - 32px); padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: 0 8px 28px rgba(0, 0, 0, .22); animation: menu-in var(--t-fast) var(--ease); }
+.menu[hidden] { display: none; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.menu-group { display: grid; }
+.menu-group + .menu-group { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+.menu-label { padding: 6px var(--s3) 2px; color: var(--muted); font-size: .75rem; font-weight: 700; text-transform: none; }
+.menu-item { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 44px; padding: 0 var(--s3); border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text); font-weight: 600; text-align: left; }
+.menu-item:active { background: var(--surface-2); }
+.menu-item[aria-checked="true"] { color: var(--accent); }
+.menu-item .ic { width: 18px; height: 18px; flex: none; }
+@media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
+/* „Mehr anzeigen“: Textknopf (nicht wie ein Knopf zum Eintragen) und die nächste Karte schaut angeschnitten mit Verlauf hervor */
+.tease { position: relative; max-height: 46px; overflow: hidden; pointer-events: none; margin-top: calc(-1 * var(--s1)); }
+.tease::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 0%, var(--bg) 95%); }
+.linkbtn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--accent); font-weight: 700; }
+.linkbtn .ic { width: 18px; height: 18px; transform: rotate(90deg); transition: transform var(--t-fast) var(--ease); }
+.linkbtn[aria-expanded="true"] .ic { transform: rotate(-90deg); }
 .bnav { gap: var(--s1); }
 .bnav .m { font-size: 1rem; min-width: 0; overflow-wrap: anywhere; }
 .bnav .btn.small { flex: none; min-width: 64px; }

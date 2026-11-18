@@ -145,10 +145,11 @@ VIEWS.umsaetze = (r) => {
   return `<div class="view-wrap">${pageHead(T_UM(), { actions: `<button type="button" class="icon-btn" data-act="import-csv" aria-label="CSV importieren">${icon('upload')}</button>` })}
     ${UM_SEG('liste')}
     <div class="todo-bar"><label class="search"><span class="sr">Umsätze durchsuchen</span>${icon('search')}<input type="search" id="q" data-fid="q" value="${esc(ui.q)}" placeholder="Suchen" autocomplete="off" enterkeyhint="search"></label>
-      <button type="button" class="icon-btn filter-btn" data-act="filter-toggle" aria-expanded="${ui.filterOpen}" aria-controls="filters-panel" aria-label="Filter${nFilt ? `, ${nFilt} aktiv` : ''}">${icon('filter')}${nFilt ? `<span class="count" aria-hidden="true">${nFilt}</span>` : ''}</button></div>
-    <div id="filters-panel"${ui.filterOpen ? '' : ' hidden'}>
-      <div class="filters" role="group" aria-label="Filter">${chips.map(([id, l]) => `<button type="button" class="chip-filter" data-act="filter" data-k="${id}" aria-pressed="${ui.filter === id}">${l}</button>`).join('')}</div>
-      ${accts.length > 1 ? `<div class="field"><label for="acct-f">Konto</label><select id="acct-f" data-fid="acct-f"><option value="">Alle Konten</option>${accts.map((a) => `<option value="${esc(a.id)}"${ui.acct === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>` : ''}</div>
+      <div class="menu-wrap"><button type="button" class="icon-btn filter-btn" data-act="filter-toggle" aria-haspopup="menu" aria-expanded="${ui.filterOpen}" aria-controls="filter-menu" aria-label="Filter${nFilt ? `, ${nFilt} aktiv` : ''}">${icon('filter')}${nFilt ? `<span class="count" aria-hidden="true">${nFilt}</span>` : ''}</button>
+        <div class="menu" id="filter-menu" role="menu" aria-label="Filter"${ui.filterOpen ? '' : ' hidden'}>
+          <div class="menu-group" role="group" aria-label="Art"><span class="menu-label">Art</span>${chips.map(([id, l]) => `<button type="button" class="menu-item" role="menuitemradio" aria-checked="${ui.filter === id}" data-act="filter" data-k="${id}"><span>${l}</span>${ui.filter === id ? icon('check') : ''}</button>`).join('')}</div>
+          ${accts.length > 1 ? `<div class="menu-group" role="group" aria-label="Konto"><span class="menu-label">Konto</span><button type="button" class="menu-item" role="menuitemradio" aria-checked="${!ui.acct}" data-act="acct" data-k=""><span>Alle Konten</span>${!ui.acct ? icon('check') : ''}</button>${accts.map((a) => `<button type="button" class="menu-item" role="menuitemradio" aria-checked="${ui.acct === a.id}" data-act="acct" data-k="${esc(a.id)}"><span>${esc(a.name)}</span>${ui.acct === a.id ? icon('check') : ''}</button>`).join('')}</div>` : ''}
+        </div></div></div>
     <div id="txlist" data-live>${txListHtml()}</div></div>`;
 };
 
