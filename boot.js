@@ -85,6 +85,7 @@ function armDelete(btn, run) {
 
 /* ---------- Klicks ---------- */
 document.addEventListener('click', (e) => {
+  const mb = e.target.closest('[data-mode]'); if (mb) { if (mb.dataset.mode !== uiMode) setMode(mb.dataset.mode); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id, k = el.dataset.k;
   switch (act) {
@@ -110,10 +111,10 @@ document.addEventListener('click', (e) => {
     case 'bank-sync': bankSync(); break;
     case 'tx-to-fixed': {
       const t = derived().txs.find((x) => x.id === id); if (!t) break;
-      const kind = t.amount > 0 ? 'income' : 'expense';
-      put('fixed', { id: uid('fx'), kind, name: t.title, amount: t.amount, day: Number(t.date.slice(8, 10)), active: true, key: kind === 'expense' ? t.mkey : undefined });
-      if (kind === 'income') { const seed = Fin.groupSeed(t); if (seed) put('rule', { id: uid('ru'), field: 'all', text: seed, sign: 'in', cat: 'einkommen' }); }
-      toast(kind === 'income' ? `„${t.title}“ zählt jetzt als regelmäßiges Einkommen` : `„${t.title}“ als Fixposten eingetragen`); go('#/plan/fix'); break;
+      const c = derived().cmap.get(t.cat);
+      if (t.amount > 0) put('fixed', { id: uid('fx'), kind: 'income', name: t.title, amount: t.amount, day: Number(t.date.slice(8, 10)), active: true, match: Fin.groupSeed(t) || t.name || '' });
+      else put('fixed', { id: uid('fx'), kind: 'expense', name: t.title, amount: t.amount, day: Number(t.date.slice(8, 10)), active: true, cat: c && c.fixed ? t.cat : 'abos' });
+      toast(t.amount > 0 ? `„${t.title}“ zählt jetzt als regelmäßiges Einkommen` : `„${t.title}“ als Fixkosten eingetragen`); go('#/plan/fix'); break;
     }
     case 'sync-now': runSync(false); break;
     case 'signout': openSheet(`<div class="sheet-head"><h2 id="sheet-title">Abmelden</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
@@ -202,6 +203,10 @@ async function checkForUpdate() {
 }
 
 /* ---------- Start ---------- */
+if (!settings().resetV1) {                                   // einmalig: automatisch erkannte Fixposten und Einkommen zurücksetzen, du trägst sie selbst ein
+  live('fixed').forEach((f) => remove('fixed', f.id));
+  setSettings({ resetV1: true });
+}
 let lastDay = todayKey();
 const dayChanged = () => { const t = todayKey(); if (t === lastDay) return; lastDay = t; if (!$('#view form')) render({ force: true }); };   // offenes Formular nie neu zeichnen (R9.5)
 setInterval(dayChanged, 30000);

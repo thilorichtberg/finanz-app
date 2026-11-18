@@ -89,11 +89,6 @@ t('Budget: ungeplante Fixkosten mindern das Budget (Ist statt Plan)', () => {
   const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -60, cat: 'abos', name: 'Netflix' }], today: '2026-11-03' });
   assert.equal(b.fixed, 60); assert.equal(b.disposable, 940); assert.equal(b.month.spent, 0);
 });
-t('Budget: Fixposten mit Händler-Schlüssel zählt nicht zusätzlich als variabel', () => {
-  const tx = { date: '2026-11-02', amount: -50, cat: 'sonstiges', name: 'Klarna Bank', purpose: '' };
-  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -50, key: Fin.merchantKey(tx) }], planned: [], settings: {}, txs: [tx], today: '2026-11-03' });
-  assert.equal(b.fixed, 50); assert.equal(b.month.spent, 0);
-});
 t('Geplant: überfällig zählt weiter, Treffer im Umsatz erledigt es', () => {
   const base = { cats, fixed: [{ kind: 'income', amount: 900 }], settings: {}, txs: [], today: '2026-11-10' };
   assert.equal(Fin.budget({ ...base, planned: [{ amount: -100, due: '2026-11-05', name: 'Klarna' }] }).planned, 100);
@@ -124,7 +119,7 @@ t('groupSeed: PayPal-Händler, Abrechner leer, normaler Name', () => {
 });
 t('Beträge: weitere Schreibweisen', () => { assert.equal(Fin.parseAmount('+5'), 5); assert.equal(Fin.parseAmount('-1.234'), -1234); assert.equal(Fin.parseAmount('1,234.56'), 1234.56); });
 t('Budget: Ist über Plan bei Fixkosten nimmt den höheren Wert', () => {
-  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -80, cat: 'abos', name: 'x' }], today: '2026-11-03' });
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30, cat: 'abos' }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -80, cat: 'abos', name: 'x' }], today: '2026-11-03' });
   assert.equal(b.fixed, 80);
 });
 t('Budgetzeitraum ab Tag 30', () => {
@@ -146,15 +141,6 @@ t('Unterhalt um den 30./1. wird als wiederkehrend erkannt (auch bei zwei Zahlung
   const rec = Fin.detectRecurring([mk('2026-09-01'), mk('2026-10-01'), mk('2026-10-30')]);
   assert.equal(rec.length, 1); assert.equal(rec[0].kind, 'income'); assert.equal(rec[0].amount, 590);
 });
-t('Fixposten mit Schlüssel: Ist ersetzt Plan nur beim selben Händler, nicht abgebuchte zählen mit Plan', () => {
-  const ms = { name: 'MDNS Sportstudio GmbH', purpose: '', date: '2026-11-02', amount: -29.9, cat: 'abos' };
-  const key = Fin.merchantKey(ms);
-  const fixed = [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -69, key: Fin.merchantKey({ name: 'Alter Verein', purpose: '' }) }, { kind: 'expense', amount: -30, key }];
-  const b = Fin.budget({ cats, fixed, planned: [], settings: {}, txs: [{ ...ms, mkey: key }], today: '2026-11-03' });
-  assert.equal(b.fixed, 69 + 30);         // veralteter Posten (nie abgebucht) zählt weiter, der andere hat 29,90 gebucht, Plan 30 gilt
-  const b2 = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -20, key }], planned: [], settings: {}, txs: [{ ...ms, amount: -86, mkey: key }], today: '2026-11-03' });
-  assert.equal(b2.fixed, 86);             // zwei Monate auf einmal gebucht: der Ist-Betrag zählt
-});
 t('Wiederkehrend: Doppelbuchung (zwei Monate auf einmal) bricht die Erkennung nicht, Name statt Regelbezeichnung', () => {
   const mk = (d, a) => ({ id: d, date: d, amount: a, name: 'Hommer Fitness GmbH', purpose: 'Basic', cat: 'abos', label: 'Fitnessstudio' });
   const rec = Fin.detectRecurring([mk('2026-09-01', -29.9), mk('2026-10-01', -59.8), mk('2026-11-02', -29.9)]);
@@ -165,17 +151,6 @@ t('Wiederkehrend: Nachzahlung über zwei Monate (43 €, dann 86 € nach zwei M
   const rec = Fin.detectRecurring([mk('2026-09-01', -43), mk('2026-11-02', -86)]);
   assert.equal(rec.length, 1); assert.equal(rec[0].amount, -43);
 });
-t('Gehalt-Abweichung: ok, abweichend, ausstehend, überfällig, Teilzahlungen werden summiert', () => {
-  const dad = (d, a) => ({ date: d, amount: a, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'einkommen' }), key = Fin.merchantKey(dad('x', 1));
-  const fixed = [{ id: 'f', kind: 'income', name: 'Unterhalt', amount: 590, day: 30, active: true, key }], st = { periodStart: 30 };
-  const run = (txs, today) => Fin.incomeCheck({ txs, fixed, settings: st, today })[0];
-  assert.equal(run([dad('2026-10-30', 590)], '2026-11-18').status, 'ok');
-  assert.equal(run([dad('2026-10-30', 520)], '2026-11-18').status, 'diff'); assert.equal(run([dad('2026-10-30', 520)], '2026-11-18').diff, -70);
-  assert.equal(run([dad('2026-10-30', 300), dad('2026-11-02', 290)], '2026-11-18').status, 'ok');          // zwei Teilzahlungen
-  const alt = [dad('2026-09-30', 590)];
-  assert.equal(run(alt, '2026-11-02').status, 'pending'); assert.equal(run(alt, '2026-11-18').status, 'late'); assert.equal(run([], '2026-11-18').status, 'unknown');
-  assert.equal(Fin.incomeCheck({ txs: [], fixed: [{ kind: 'income', amount: 100, day: 1 }], settings: {}, today: '2026-11-18' })[0].status, 'unknown');
-});
 t('Rückblick: letzter Budgetzeitraum, Summen, Top-Kategorien, gehalten oder nicht', () => {
   const txs = [{ date: '2026-10-05', amount: -100, cat: 'lebensmittel' }, { date: '2026-10-06', amount: -50, cat: 'essen' }, { date: '2026-10-07', amount: 600, cat: 'einkommen' },
     { date: '2026-10-08', amount: -999, cat: 'umbuchung' }, { date: '2026-09-10', amount: -30, cat: 'lebensmittel' }];
@@ -183,6 +158,27 @@ t('Rückblick: letzter Budgetzeitraum, Summen, Top-Kategorien, gehalten oder nic
   assert.equal(r.from, '2026-10-01'); assert.equal(r.to, '2026-10-31'); assert.equal(r.income, 600); assert.equal(r.expense, 150); assert.equal(r.net, 450); assert.equal(r.saveRate, 75);
   assert.equal(r.spent, 150); assert.equal(r.kept, true); assert.equal(r.top[0].id, 'lebensmittel'); assert.equal(r.top[0].prev, 30); assert.equal(r.prevExpense, 30);
   assert.equal(Fin.review({ txs, cats, fixed: [{ kind: 'income', amount: 100, active: true }], settings: {}, today: '2026-11-18' }).kept, false);
+});
+t('Fixkosten je Kategorie: höherer Wert aus Posten und Buchungen, veralteter Posten bleibt, Posten außerhalb zählt mit Plan', () => {
+  const fixed = [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30, cat: 'abos' }, { kind: 'expense', amount: -40, cat: 'abos' }, { kind: 'expense', amount: -68, cat: 'wohnen' }, { kind: 'expense', amount: -20, cat: 'sonstiges' }];
+  const tx = (c, a, d = '2026-11-02') => ({ date: d, amount: a, cat: c, name: 'x' });
+  const b = (txs) => Fin.budget({ cats, fixed, planned: [], settings: {}, txs, today: '2026-11-03' });
+  assert.equal(b([]).fixed, 70 + 68 + 20);                                        // nichts gebucht: Pläne zählen (auch nicht mehr abgebuchte)
+  assert.equal(b([tx('abos', -29.9), tx('wohnen', -68)]).fixed, 70 + 68 + 20);    // gebucht unter Plan: Plan gilt
+  assert.equal(b([tx('abos', -29.9), tx('abos', -86)]).fixed, 115.9 + 68 + 20);   // gebucht über Plan (zwei Monate auf einmal): Ist gilt
+  assert.equal(b([tx('versicherung', -50)]).fixed, 70 + 68 + 20 + 50);            // ungeplante Rechnung in einer Fixkosten-Kategorie zählt
+  assert.equal(b([tx('sonstiges', -20)]).month.spent, 20);                        // Buchung in einer Nicht-Fixkosten-Kategorie bleibt variabel
+});
+t('Gehalt-Abweichung: ok, abweichend, ausstehend, überfällig, Teilzahlungen werden summiert', () => {
+  const dad = (d, a) => ({ date: d, amount: a, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'einkommen' });
+  const fixed = [{ id: 'f', kind: 'income', name: 'Unterhalt', amount: 590, day: 30, active: true, match: 'richtberg martin' }], st = { periodStart: 30 };
+  const run = (txs, today) => Fin.incomeCheck({ txs, fixed, settings: st, today })[0];
+  assert.equal(run([dad('2026-10-30', 590)], '2026-11-18').status, 'ok');
+  assert.equal(run([dad('2026-10-30', 520)], '2026-11-18').status, 'diff'); assert.equal(run([dad('2026-10-30', 520)], '2026-11-18').diff, -70);
+  assert.equal(run([dad('2026-10-30', 300), dad('2026-11-02', 290)], '2026-11-18').status, 'ok');
+  const alt = [dad('2026-09-30', 590)];
+  assert.equal(run(alt, '2026-11-02').status, 'pending'); assert.equal(run(alt, '2026-11-18').status, 'late'); assert.equal(run([], '2026-11-18').status, 'unknown');
+  assert.equal(Fin.incomeCheck({ txs: [], fixed: [{ kind: 'income', amount: 100, day: 1 }], settings: {}, today: '2026-11-18' })[0].status, 'unknown');
 });
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);

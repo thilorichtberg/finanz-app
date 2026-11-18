@@ -4,6 +4,8 @@
    ===================================================================== */
 
 const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1 };
+const PIE_COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--pie-other)'];
+const T_UM = () => (uiMode === 'neu' ? 'Übersicht' : 'Umsätze');
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const MON_S = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const monthLabel = (mk) => `${MONTHS[Number(mk.slice(5)) - 1]} ${mk.slice(0, 4)}`;
@@ -135,7 +137,7 @@ VIEWS.umsaetze = (r) => {
   if (sub === 'berichte') return umBerichte();
   const accts = live('acct');
   const chips = [['alle', 'Alle'], ['ausgaben', 'Ausgaben'], ['einnahmen', 'Einnahmen'], ['sonstiges', 'Sonstiges']];
-  return `<div class="view-wrap">${pageHead('Umsätze', { actions: `<button type="button" class="icon-btn" data-act="import-csv" aria-label="CSV importieren">${icon('upload')}</button>` })}
+  return `<div class="view-wrap">${pageHead(T_UM(), { actions: `<button type="button" class="icon-btn" data-act="import-csv" aria-label="CSV importieren">${icon('upload')}</button>` })}
     ${UM_SEG('liste')}
     <div class="todo-bar"><label class="search"><span class="sr">Umsätze durchsuchen</span>${icon('search')}<input type="search" id="q" data-fid="q" value="${esc(ui.q)}" placeholder="Suchen" autocomplete="off" enterkeyhint="search"></label></div>
     <div class="filters" role="group" aria-label="Filter">${chips.map(([id, l]) => `<button type="button" class="chip-filter" data-act="filter" data-k="${id}" aria-pressed="${ui.filter === id}">${l}</button>`).join('')}</div>
@@ -144,21 +146,23 @@ VIEWS.umsaetze = (r) => {
 };
 
 /* ---------- Umsätze: Kategorien ---------- */
-function catRowHtml(c, sum, total, warnAt, month) {
+function catRowHtml(c, sum, total, warnAt, color) {
   const hasB = c.budget > 0, p = hasB ? pct(sum, c.budget) : pct(sum, total);
   const sub = hasB ? `${eur(sum)} von ${eur(c.budget)}${p >= 100 ? ' – überschritten' : p >= warnAt ? ' – bald aufgebraucht' : ''}` : `${p} % der Ausgaben`;
   const cls = hasB ? (p >= 100 ? 'bad' : p >= warnAt ? 'warn' : '') : '';
-  return `<a class="catrow" href="#/kategorie/${c.id}"><span class="top"><span class="cat-ic">${icon(c.icon)}</span><span class="nm">${esc(c.name)}</span><span class="amt">${eur(sum)}</span></span>
+  return `<a class="catrow" href="#/kategorie/${c.id}"><span class="top">${color ? `<i class="sw" style="background:${color}"></i>` : ''}<span class="cat-ic">${icon(c.icon)}</span><span class="nm">${esc(c.name)}</span><span class="amt">${eur(sum)}</span></span>
     <span class="meter ${cls}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, p)}" aria-label="${esc(sub)}"><i style="transform:scaleX(${Math.min(1, p / 100)})"></i></span><span class="sub"><span class="${cls === 'bad' ? 'over-text' : cls === 'warn' ? 'warn-text' : ''}">${esc(sub)}</span></span></a>`;
 }
 function umKategorien() {
   const d = derived(), [a, z] = monthRange(ui.month), st = settings();
   const sums = Fin.byCategory(d.txs, d.cats, a, z), total = sums.reduce((s, x) => s + x.total, 0);
   const have = new Set(sums.map((s) => s.id));
+  const pieParts = sums.slice(0, 6).map((x, i) => ({ name: catById(x.id).name, total: x.total, color: PIE_COLORS[i] }));
+  if (sums.length > 6) pieParts.push({ name: 'Weitere', total: sums.slice(6).reduce((q, x) => q + x.total, 0), color: PIE_COLORS[6] });
   const withBudget = d.cats.filter((c) => c.budget > 0 && !have.has(c.id));
-  return `<div class="view-wrap">${pageHead('Umsätze')}${UM_SEG('kategorien')}${monthNav(ui.month)}
+  return `<div class="view-wrap">${pageHead(T_UM())}${UM_SEG('kategorien')}${monthNav(ui.month)}
     <dl class="kv" style="margin-bottom:var(--s4)"><div class="total"><dt class="k">Ausgaben im ${esc(MONTHS[Number(ui.month.slice(5)) - 1])}</dt><dd>${eur(total)}</dd></div></dl>
-    ${sums.length || withBudget.length ? `<div class="list-block">${sums.map((s) => catRowHtml(catById(s.id), s.total, total, st.warnAt)).join('')}${withBudget.map((c) => catRowHtml(c, 0, total, st.warnAt)).join('')}</div>`
+    ${uiMode === 'neu' ? pieHtml(pieParts) : ''}${sums.length || withBudget.length ? `<div class="list-block">${sums.map((s, i) => catRowHtml(catById(s.id), s.total, total, st.warnAt, uiMode === 'neu' ? PIE_COLORS[Math.min(i, 6)] : '')).join('')}${withBudget.map((c) => catRowHtml(c, 0, total, st.warnAt)).join('')}</div>`
       : emptyBlock('Keine Ausgaben', 'In diesem Monat gibt es keine Umsätze.', '')}
     <p class="hint-line" style="margin-top:var(--s3)">Umbuchungen zählen nicht mit. Ein Budget pro Kategorie stellst du unter Einstellungen → Kategorien ein.</p></div>`;
 }
@@ -186,14 +190,16 @@ function umBerichte() {
     return `<rect class="bar-in" x="${x0}" y="${112 - hi}" width="${bw}" height="${hi}" rx="3"/><rect class="bar-out" x="${x0 + bw + 4}" y="${112 - he}" width="${bw}" height="${he}" rx="3"/><text x="${x0 + bw + 2}" y="130" text-anchor="middle">${MON_S[Number(x.month.slice(5)) - 1]}</text>`;
   }).join('');
   const diff = cur.expense - pr.expense;
-  return `<div class="view-wrap">${pageHead('Umsätze')}${UM_SEG('berichte')}${monthNav(mk)}
+  return `<div class="view-wrap">${pageHead(T_UM())}${UM_SEG('berichte')}${monthNav(mk)}
     <div class="sum3"><div class="stat"><div class="l">Einnahmen</div><div class="v amt in">${eur(cur.income)}</div></div><div class="stat"><div class="l">Ausgaben</div><div class="v amt">${eur(cur.expense)}</div></div><div class="stat"><div class="l">Saldo</div><div class="v amt ${cur.net < 0 ? 'over' : 'in'}">${signed(cur.net)}</div></div></div>
     <p class="hint-line" style="margin-bottom:var(--s3)">${pr.expense || pr.income ? `Gegenüber ${esc(MONTHS[Number(prev.slice(5)) - 1])}: Ausgaben ${diff === 0 ? 'unverändert' : (diff > 0 ? eur(diff) + ' mehr' : eur(-diff) + ' weniger')}.` : 'Kein Vormonat zum Vergleichen.'}</p>
     <div class="chart" role="img" aria-label="Einnahmen und Ausgaben der letzten 6 Monate. ${rows.map((x) => `${MONTHS[Number(x.month.slice(5)) - 1]}: Einnahmen ${eur(x.income)}, Ausgaben ${eur(x.expense)}`).join('. ')}">
       <svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><line class="gridline" x1="0" x2="${W}" y1="112" y2="112"/>${bars}</svg>
       <div class="chart-legend"><span><i style="background:var(--accent)"></i>Einnahmen</span><span><i style="background:var(--muted)"></i>Ausgaben</span></div></div>
     <section class="section"><h2>Größte Ausgaben nach Händler</h2>${top.length ? `<dl class="kv">${top.map((m) => `<div><dt>${esc(m.name)} <span class="hint-line">(${m.n}×)</span></dt><dd>${eur(m.total)}</dd></div>`).join('')}</dl>` : '<p class="hint-line">In diesem Monat keine Ausgaben.</p>'}</section>
-    <section class="section"><h2>Wiederkehrende Zahlungen</h2>${d.recurring.length ? `<dl class="kv">${d.recurring.map((x) => `<div><dt>${esc(x.name)} <span class="hint-line">Tag ${x.day}</span></dt><dd>${eur(x.amount)}</dd></div>`).join('')}</dl>` : '<p class="hint-line">Noch keine erkannt. Ab drei Monaten Umsätze sieht man Muster.</p>'}</section>
+    <section class="section"><h2>Mehr</h2><div class="list-block">
+      <a class="row-link-card" href="#/rueckblick"><span class="info"><span class="name">Rückblick</span><br><span class="meta">Letzte Budgetmonate im Überblick</span></span>${icon('right')}</a>
+      <a class="row-link-card" href="#/zuordnen"><span class="info"><span class="name">Sonstiges zuordnen</span><br><span class="meta">Regeln für nicht erkannte Umsätze</span></span>${icon('right')}</a></div></section>
     <section class="section"><h2>Export</h2><button type="button" class="btn block" data-act="export-csv">${icon('download')}Alle Umsätze als CSV</button></section></div>`;
 }
 

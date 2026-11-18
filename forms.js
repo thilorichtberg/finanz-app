@@ -6,13 +6,15 @@
 
 /* ---------- Neu ---------- */
 VIEWS.neu = (r) => {
+  if (r.a === 'fix' && r.b && (get('fixed', r.b) || {}).kind === 'income') return renderForm('einkommen', r.b);
   if (r.a && FORM_DEFS[r.a]) return renderForm(r.a, r.b);
   const tile = (href, ic, name, meta, primary) => `<a class="tile ${primary ? 'primary' : ''}" href="${href}"><span class="ic-wrap">${icon(ic)}</span><span class="info"><span class="name">${name}</span><br><span class="meta">${meta}</span></span>${icon('right')}</a>`;
   return `<div class="view-wrap">${pageHead('Neu')}<div class="tiles">
     ${tile('#/neu/ausgabe', 'minus', 'Ausgabe erfassen', 'Barzahlung oder etwas, das nicht im Bankexport steht', true)}
     ${tile('#/neu/einnahme', 'plus', 'Einnahme erfassen', 'Einmalige Einnahme')}
     ${tile('#/neu/geplant', 'calendar', 'Geplante Zahlung', 'Zum Beispiel PayPal oder Klarna in 30 Tagen')}
-    ${tile('#/neu/fix', 'repeat', 'Fixposten', 'Miete, Abo oder regelmäßiges Einkommen')}
+    ${tile('#/neu/fix', 'repeat', 'Fixkosten', 'Miete, Abo, Versicherung: jeden Monat gleich')}
+    ${tile('#/neu/einkommen', 'trend', 'Regelmäßiges Einkommen', 'Zum Beispiel Gehalt oder Unterhalt')}
     ${tile('#/neu/ziel', 'target', 'Sparziel', 'Ein Betrag, auf den du hinsparst')}
     ${tile('#/neu/regel', 'tag', 'Eigene Regel', 'Bestimmte Umsätze immer einer Kategorie zuordnen')}
     <button type="button" class="tile" data-act="import-csv"><span class="ic-wrap">${icon('upload')}</span><span class="info"><span class="name">CSV importieren</span><br><span class="meta">Umsatz-Export deiner Bank</span></span>${icon('right')}</button></div></div>`;
@@ -80,18 +82,28 @@ const FORM_DEFS = {
       { n: 'cat', t: 'select', l: 'Kategorie', o: [['', 'Automatisch zuordnen'], ...catOpts(['income', 'refund'])] }, ...(live('acct').length ? [{ n: 'acct', t: 'select', l: 'Konto', o: accOpts() }] : [])],
     save: (v) => { put('tx', { id: uid('tx_m'), acct: v.acct || '', date: v.date, amount: v.amount, name: v.name, purpose: '', type: 'Manuell', iban: '', manualEntry: true, manual: v.cat || undefined }); return { to: '#/umsaetze', msg: `Einnahme über ${eur(v.amount)} gespeichert` }; } }),
   geplant: (id) => { const it = id ? get('planned', id) : null; if (id && !it) return null;
-    return { title: it ? 'Geplante Zahlung' : 'Zahlung planen', back: '#/plan', intro: 'Wird nur bei dir gespeichert, es wird nichts bezahlt. Ab dem Monat der Fälligkeit mindert sie das Budget, vorher steht sie unter „Als Nächstes fällig“. Kommt der passende Umsatz, hakt die App sie selbst ab.',
+    return { title: it ? 'Geplante Zahlung' : 'Zahlung planen', back: '#/plan/geplant', intro: 'Wird nur bei dir gespeichert, es wird nichts bezahlt. Ab dem Monat der Fälligkeit mindert sie das Budget, vorher steht sie unter „Als Nächstes fällig“. Kommt der passende Umsatz, hakt die App sie selbst ab.',
       values: it ? { name: it.name, amount: Math.abs(it.amount), due: it.due, note: it.note || '' } : { due: Fin.addDays(todayStr(), 30) },
       fields: [{ n: 'name', t: 'text', l: 'Wofür?', ph: 'zum Beispiel PayPal, Klarna', max: 80 }, { n: 'amount', t: 'money', l: 'Betrag' }, { n: 'due', t: 'date', l: 'Fällig am' }, { n: 'note', t: 'area', l: 'Notiz', opt: true }],
       del: it ? { kind: 'planned', label: 'Zahlung löschen' } : null,
-      save: (v) => { put('planned', Object.assign(it || { id: uid('pl') }, { name: v.name, amount: -v.amount, due: v.due, note: v.note })); return { to: '#/plan', msg: 'Geplante Zahlung gespeichert' }; } }; },
+      save: (v) => { put('planned', Object.assign(it || { id: uid('pl') }, { name: v.name, amount: -v.amount, due: v.due, note: v.note })); return { to: '#/plan/geplant', msg: 'Geplante Zahlung gespeichert' }; } }; },
   fix: (id) => { const it = id ? get('fixed', id) : null; if (id && !it) return null;
-    return { title: it ? 'Fixposten' : 'Fixposten anlegen', back: '#/plan/fix', intro: 'Fixposten werden jeden Monat vom Budget abgezogen (Ausgaben) oder dazugerechnet (Einnahmen).',
-      values: it ? { kind: it.kind, name: it.name, amount: Math.abs(it.amount), day: it.day, active: it.active !== false } : { kind: 'expense', active: true, day: '1' },
-      fields: [{ n: 'kind', t: 'select', l: 'Art', o: [['expense', 'Ausgabe (zum Beispiel Miete, Abo)'], ['income', 'Einnahme (zum Beispiel Gehalt)']] }, { n: 'name', t: 'text', l: 'Name', ph: 'zum Beispiel Miete', max: 60 },
-        { n: 'amount', t: 'money', l: 'Betrag pro Monat' }, { n: 'day', t: 'day', l: 'Tag im Monat', hint: 'Kürzere Monate nutzen den letzten Tag.' }, { n: 'active', t: 'switch', l: 'Aktiv', hint: 'Pausierte Posten zählen nicht im Budget.' }],
-      del: it ? { kind: 'fixed', label: 'Fixposten löschen' } : null,
-      save: (v) => { const rec = Object.assign(it || { id: uid('fx') }, { kind: v.kind, name: v.name, amount: v.kind === 'income' ? v.amount : -v.amount, day: v.day, active: v.active }); if (!rec.key) rec.key = Fin.merchantKey({ name: v.name, purpose: '' }); put('fixed', rec); return { to: '#/plan/fix', msg: 'Fixposten gespeichert' }; } }; },
+    const fixedCats = derived().cats.filter((c) => c.fixed && c.kind === 'expense').map((c) => [c.id, c.name]);
+    return { title: it ? 'Fixkosten' : 'Fixkosten anlegen', back: '#/plan/fix', intro: 'Wird jeden Monat vom Budget abgezogen. Die Kategorie bestimmt, welche Buchungen zu diesen Fixkosten zählen: Buchungen in einer Fixkosten-Kategorie belasten das Tageslimit nicht zusätzlich.',
+      values: it ? { name: it.name, amount: Math.abs(it.amount), day: it.day, cat: it.cat || '', active: it.active !== false } : { active: true, day: '1', cat: (fixedCats[0] || [''])[0] },
+      fields: [{ n: 'name', t: 'text', l: 'Name', ph: 'zum Beispiel Miete', max: 60 }, { n: 'amount', t: 'money', l: 'Betrag pro Monat' }, { n: 'day', t: 'day', l: 'Tag im Monat', hint: 'Kürzere Monate nutzen den letzten Tag.' },
+        { n: 'cat', t: 'select', l: 'Kategorie', o: [...fixedCats, ...(it && it.cat && !fixedCats.some((c) => c[0] === it.cat) ? [[it.cat, catById(it.cat).name + ' (keine Fixkosten-Kategorie)']] : [])], hint: 'Eigene Fixkosten-Kategorien legst du unter Einstellungen → Kategorien an.' },
+        { n: 'active', t: 'switch', l: 'Aktiv', hint: 'Pausierte Posten zählen nicht im Budget.' }],
+      del: it ? { kind: 'fixed', label: 'Fixkosten löschen' } : null,
+      save: (v) => { put('fixed', Object.assign(it || { id: uid('fx') }, { kind: 'expense', name: v.name, amount: -v.amount, day: v.day, cat: v.cat, active: v.active })); return { to: '#/plan/fix', msg: 'Fixkosten gespeichert' }; } }; },
+  einkommen: (id) => { const it = id ? get('fixed', id) : null; if (id && !it) return null;
+    return { title: it ? 'Regelmäßiges Einkommen' : 'Einkommen anlegen', back: '#/plan/fix', intro: 'Dieses Einkommen wird jeden Monat zum Budget gerechnet. Der Eingang kann auch ein paar Tage früher oder später kommen.',
+      values: it ? { name: it.name, amount: Math.abs(it.amount), day: it.day, match: it.match || '', active: it.active !== false } : { active: true, day: '1' },
+      fields: [{ n: 'name', t: 'text', l: 'Name', ph: 'zum Beispiel Unterhalt', max: 60 }, { n: 'amount', t: 'money', l: 'Betrag pro Monat' }, { n: 'day', t: 'day', l: 'Üblicher Tag im Monat', hint: 'Kürzere Monate nutzen den letzten Tag.' },
+        { n: 'match', t: 'text', l: 'Absender enthält', opt: true, ph: 'zum Beispiel Name auf dem Kontoauszug', max: 60, hint: 'Damit prüft die App, ob das Geld angekommen ist und ob der Betrag abweicht.' },
+        { n: 'active', t: 'switch', l: 'Aktiv', hint: 'Pausierte Posten zählen nicht im Budget.' }],
+      del: it ? { kind: 'fixed', label: 'Einkommen löschen' } : null,
+      save: (v) => { put('fixed', Object.assign(it || { id: uid('fx') }, { kind: 'income', name: v.name, amount: v.amount, day: v.day, match: v.match || '', active: v.active })); return { to: '#/plan/fix', msg: 'Einkommen gespeichert' }; } }; },
   ziel: (id) => { const it = id ? get('goal', id) : null; if (id && !it) return null;
     return { title: it ? 'Sparziel' : 'Sparziel anlegen', back: '#/plan/ziele', values: it ? { name: it.name, target: it.target, saved: it.saved } : { saved: '0' },
       fields: [{ n: 'name', t: 'text', l: 'Wofür sparst du?', ph: 'zum Beispiel Urlaub', max: 60 }, { n: 'target', t: 'money', l: 'Zielbetrag' }, { n: 'saved', t: 'money', l: 'Schon gespart', zero: true }],
@@ -170,7 +182,9 @@ function submitTx(form) {
 }
 
 /* ---------- Plan ---------- */
-const PL_SEG = (cur) => seg([{ id: 'geplant', label: 'Geplant', href: '#/plan' }, { id: 'fix', label: 'Fixkosten', href: '#/plan/fix' }, { id: 'ziele', label: 'Sparziele', href: '#/plan/ziele' }], cur, 'Plan');
+const PL_SEG = (cur) => seg(uiMode === 'neu'
+  ? [{ id: 'fix', label: 'Fixkosten', href: '#/plan' }, { id: 'geplant', label: 'Geplant', href: '#/plan/geplant' }, { id: 'ziele', label: 'Sparziele', href: '#/plan/ziele' }]
+  : [{ id: 'geplant', label: 'Geplant', href: '#/plan' }, { id: 'fix', label: 'Fixkosten', href: '#/plan/fix' }, { id: 'ziele', label: 'Sparziele', href: '#/plan/ziele' }], cur, 'Plan');
 VIEWS.plan = (r) => (r.a === 'fix' ? planFix() : r.a === 'ziele' ? planZiele() : planGeplant());
 function planGeplant() {
   const all = derived().planned.sort((a, b) => a.due.localeCompare(b.due)), t = todayKey();
@@ -183,32 +197,25 @@ function planGeplant() {
     <details class="fold"><summary>Bezahlt (${done.length})${icon('right', 'chev')}</summary><div class="list">${done.map(row).join('') || '<p class="hint-line" style="padding:0 var(--s2)">Noch nichts abgehakt.</p>'}</div></details></div>`;
 }
 function planFix() {
-  const items = live('fixed'), inc = items.filter((x) => x.kind === 'income').sort((a, b) => a.day - b.day), exp = items.filter((x) => x.kind !== 'income').sort((a, b) => a.day - b.day);
-  const sum = (l) => l.filter((x) => x.active !== false).reduce((s, x) => s + Math.abs(x.amount), 0), d = derived();
-  const b = budget();
-  // Was ist mit dem Posten in diesem Budgetmonat passiert? Zeigt veraltete Posten (nicht mehr abgebucht) und Sammelbuchungen (mehrere Monate auf einmal)
+  const items = live('fixed'), d = derived(), b = budget(), byDay = (x, y) => x.day - y.day;
+  const inc = items.filter((x) => x.kind === 'income').sort(byDay), exp = items.filter((x) => x.kind !== 'income').sort(byDay);
+  const sum = (l) => l.filter((x) => x.active !== false).reduce((s, x) => s + Math.abs(x.amount), 0);
   const ic = new Map(Fin.incomeCheck({ txs: d.txs, fixed: items, settings: settings(), today: todayKey() }).map((x) => [x.id, x]));
-  const state = (x) => {
-    if (x.kind === 'income' && x.active !== false) {
-      const c = ic.get(x.id); if (!c || c.status === 'unknown') return { text: 'Eingang nicht prüfbar: noch keine passende Zahlung gefunden', cls: '' };
-      return { ok: { text: `Eingegangen ${eur(c.actual)}`, cls: '' }, diff: { text: `Eingegangen ${eur(c.actual)} statt ${eur(c.plan)}`, cls: 'warn-text' }, pending: { text: `Erwartet am ${dateShort(c.due)}`, cls: '' }, late: { text: `Noch nicht eingegangen, erwartet am ${dateShort(c.due)}`, cls: 'warn-text' } }[c.status];
-    }
-    if (x.kind === 'income' || !x.key || x.active === false) return { text: '', cls: '' };
-    const mine = d.txs.filter((t) => t.mkey === x.key && t.amount < 0 && !t.ignore), now = mine.filter((t) => t.date >= b.from && t.date <= b.to);
-    const paid = now.reduce((s, t) => s - t.amount, 0), plan = Math.abs(x.amount);
-    if (paid > 0) return { text: paid >= plan * 1.8 ? `Gebucht ${eur(paid)}, das sind etwa ${Math.round(paid / plan)} Monate auf einmal` : `Gebucht ${eur(paid)}`, cls: paid >= plan * 1.8 ? 'warn-text' : '' };
-    if (!mine.length) return { text: 'Noch nie in deinen Umsätzen gefunden. Noch aktuell?', cls: 'warn-text' };
-    const gap = Math.round((Date.now() - Fin.dparse(mine[0].date)) / 864e5);
-    return gap > 45 ? { text: `Zuletzt am ${dateShort(mine[0].date)} abgebucht. Noch aktuell?`, cls: 'warn-text' } : { text: 'Noch nicht abgebucht', cls: '' };
+  const incState = (x) => {
+    const c = ic.get(x.id); if (x.active === false || !c) return { text: '', cls: '' };
+    return { unknown: { text: x.match ? 'Noch keine passende Zahlung gefunden' : 'Eingang wird nicht geprüft (kein Absender angegeben)', cls: '' }, ok: { text: `Eingegangen ${eur(c.actual)}`, cls: '' }, diff: { text: `Eingegangen ${eur(c.actual)} statt ${eur(c.plan)}`, cls: 'warn-text' },
+      pending: { text: `Erwartet am ${dateShort(c.due)}`, cls: '' }, late: { text: `Noch nicht eingegangen, erwartet am ${dateShort(c.due)}`, cls: 'warn-text' } }[c.status];
   };
-  const row = (x) => { const st = state(x); return `<a class="tx ${x.active === false ? 'muted-row' : ''}" href="#/neu/fix/${encodeURIComponent(x.id)}"><span class="cat-ic">${icon(x.kind === 'income' ? 'trend' : 'repeat')}</span><span class="info"><span class="name">${esc(x.name)}</span><br><span class="meta">Am ${x.day}. jeden Monat${x.active === false ? ' · pausiert' : ''}</span>${st.text ? `<br><span class="meta ${st.cls}">${esc(st.text)}</span>` : ''}</span>${amt(x.amount)}</a>`; };
-  const sug = d.suggestions.slice(0, 6).map((s) => `<div class="notice" style="margin-top:var(--s2)"><p><strong>${esc(s.name)}</strong> · ${eur(s.amount)} · um den ${s.day}. · ${s.count}× gesehen</p><div class="btn-row" style="display:flex;gap:var(--s2)"><button type="button" class="btn small" data-act="adopt" data-k="${esc(s.key)}">Übernehmen</button><button type="button" class="btn small ghost" data-act="dismiss" data-k="${esc(s.key)}">Ausblenden</button></div></div>`).join('');
-  return `<div class="view-wrap">${pageHead('Plan', { actions: `<a class="icon-btn add" href="#/neu/fix" aria-label="Fixposten anlegen">${icon('plus')}</a>` })}${PL_SEG('fix')}
-    <dl class="kv"><div><dt>Einnahmen pro Monat</dt><dd>${eur(sum(inc))}</dd></div><div><dt>Fixkosten pro Monat</dt><dd>${eur(sum(exp))}</dd></div><div class="total"><dt class="k">Bleibt übrig</dt><dd>${eur(sum(inc) - sum(exp))}</dd></div></dl>
-    ${[...ic.values()].filter((c) => c.status === 'diff').map((c) => `<div class="notice warn" role="status"><p><strong>${esc(c.name)}</strong>: ${eur(c.actual)} eingegangen, geplant waren ${eur(c.plan)} (${signed(c.diff)}). Rechnest du ab jetzt mit dem neuen Betrag?</p><button type="button" class="btn small" data-act="fix-adjust" data-id="${esc(c.id)}">Plan auf ${eur(c.actual)} anpassen</button></div>`).join('')}
-    <section class="section"><h2>Einnahmen <span class="amt in">${eur(sum(inc))}</span></h2>${inc.length ? `<div class="list-block">${inc.map(row).join('')}</div>` : '<p class="hint-line">Noch kein regelmäßiges Einkommen. Ohne Einkommen kann ich kein Tageslimit berechnen.</p><a class="btn primary" href="#/neu/fix">Einkommen eintragen</a>'}</section>
-    <section class="section"><h2>Fixkosten <span class="amt">${eur(-sum(exp))}</span></h2>${exp.length ? `<div class="list-block">${exp.map(row).join('')}</div>` : '<p class="hint-line">Miete, Strom, Handy, Abos: alles, was jeden Monat gleich abgebucht wird.</p>'}</section>
-    ${d.suggestions.length ? `<section class="section"><h2>Erkannt in deinen Umsätzen</h2><p class="hint-line">Diese Zahlungen kommen regelmäßig. Übernimm sie als Fixposten.</p>${sug}</section>` : ''}</div>`;
+  const incRow = (x) => { const st = incState(x); return `<a class="tx ${x.active === false ? 'muted-row' : ''}" href="#/neu/einkommen/${encodeURIComponent(x.id)}"><span class="cat-ic">${icon('trend')}</span><span class="info"><span class="name">${esc(x.name)}</span><br><span class="meta">Am ${x.day}. jeden Monat${x.active === false ? ' · pausiert' : ''}</span>${st.text ? `<br><span class="meta ${st.cls}">${esc(st.text)}</span>` : ''}</span>${amt(x.amount)}</a>`; };
+  const expRow = (x) => { const c = x.cat ? catById(x.cat) : null; return `<a class="tx ${x.active === false ? 'muted-row' : ''}" href="#/neu/fix/${encodeURIComponent(x.id)}"><span class="cat-ic">${icon(c ? c.icon : 'repeat')}</span><span class="info"><span class="name">${esc(x.name)}</span><br><span class="meta">Am ${x.day}. · ${esc(c ? c.name : 'Ohne Kategorie')}${x.active === false ? ' · pausiert' : ''}</span></span>${amt(x.amount)}</a>`; };
+  const diffs = [...ic.values()].filter((c) => c.status === 'diff').map((c) => `<div class="notice warn" role="status"><p><strong>${esc(c.name)}</strong>: ${eur(c.actual)} eingegangen, geplant waren ${eur(c.plan)} (${signed(c.diff)}). Rechnest du ab jetzt mit dem neuen Betrag?</p><button type="button" class="btn small" data-act="fix-adjust" data-id="${esc(c.id)}">Plan auf ${eur(c.actual)} anpassen</button></div>`).join('');
+  return `<div class="view-wrap">${pageHead('Plan', { actions: `<a class="icon-btn add" href="#/neu/fix" aria-label="Fixkosten anlegen">${icon('plus')}</a>` })}${PL_SEG('fix')}
+    <dl class="kv"><div><dt>Einnahmen pro Monat</dt><dd>${eur(sum(inc))}</dd></div><div><dt>Fixkosten pro Monat</dt><dd>${eur(sum(exp))}</dd></div><div class="total"><dt class="k">Bleibt übrig</dt><dd>${eur(sum(inc) - sum(exp))}</dd></div>
+      <div><dt>Im Budget gerechnet (Fixkosten)</dt><dd>${eur(b.fixed)}</dd></div></dl>
+    <p class="hint-line" style="margin-top:var(--s2)">Fixkosten belasten das Tageslimit nicht. Bucht deine Bank in einer Fixkosten-Kategorie mehr als hier steht, zählt der höhere Betrag.</p>
+    ${diffs}
+    <section class="section"><h2>Einnahmen <span class="amt in">${eur(sum(inc))}</span></h2>${inc.length ? `<div class="list-block">${inc.map(incRow).join('')}</div><a class="btn" href="#/neu/einkommen">Weiteres Einkommen eintragen</a>` : '<p class="hint-line">Noch kein regelmäßiges Einkommen. Ohne Einkommen kann ich kein Tageslimit berechnen.</p><a class="btn primary" href="#/neu/einkommen">Einkommen eintragen</a>'}</section>
+    <section class="section"><h2>Fixkosten <span class="amt">${eur(-sum(exp))}</span></h2>${exp.length ? `<div class="list-block">${exp.map(expRow).join('')}</div>` : '<p class="hint-line">Miete, Strom, Handy, Abos: alles, was jeden Monat gleich abgebucht wird. Trag es selbst ein.</p>'}<a class="btn" href="#/neu/fix">${exp.length ? 'Weitere Fixkosten' : 'Fixkosten anlegen'}</a></section></div>`;
 }
 function planZiele() {
   const goals = live('goal');

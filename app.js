@@ -51,6 +51,9 @@ const ICONS = {
   user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>', file: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/>',
   flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>', info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+  pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+  calclock: '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>',
   bank: '<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
 };
 const icon = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ICONS.dots}</svg>`;
@@ -106,20 +109,16 @@ function derived() {
     const res = t.manual && ids.has(t.manual) ? { cat: t.manual, label: '', by: 'manual' } : Fin.categorize(t, { userRules: rules, ownIbans });
     out.push(Object.assign({}, t, { cat: res.cat, label: res.label, by: res.by, rule: res.rule }));
   }
-  const rec = Fin.detectRecurring(out), keys = new Set(rec.map((r) => r.key));
   const accts = live('acct'), hasCard = accts.some((a) => a.kind === 'kredit'), tagesIds = new Set(accts.filter((a) => a.kind === 'tages').map((a) => a.id));
   for (const t of out) {
     t.mkey = Fin.merchantKey(t); t.hay = Fin.haystack(t);
-    if (t.by === 'none' && t.amount < 0 && keys.has(t.mkey)) { t.cat = 'abos'; t.by = 'recurring'; }
     t.title = t.customName || Fin.displayName(t, t);
     // Doppelt gezählt wäre: Kreditkarten-Abrechnung auf dem Giro, wenn die Kreditkarte selbst importiert ist; Tagesgeld zählt nie im Budget
     if ((hasCard && t.cat === 'kreditkarte') || tagesIds.has(t.acct)) t.autoIgnore = true;
   }
   out.sort((a, b) => (b.date.localeCompare(a.date)) || (a.id < b.id ? 1 : -1));
   // Vorschläge: erkannte Wiederkehrer, die noch nicht als Fixposten eingetragen sind
-  const fixedNames = live('fixed').map((f) => Fin.fold(f.name));
-  const fixedKeys = new Set(live('fixed').map((f) => f.key).filter(Boolean));
-  const suggestions = rec.filter((r) => !fixedKeys.has(r.key)).filter((r) => !fixedNames.some((n) => n && (n.includes(Fin.fold(r.name)) || Fin.fold(r.name).includes(n)))).filter((r) => !(settings().dismissed || {})[r.key]);
+  const rec = [], suggestions = [];                  // Wiederkehrendes wird nicht mehr automatisch erkannt: Fixkosten trägst du selbst ein
   const used = new Set(), byDue = live('planned').sort((a, b) => a.due.localeCompare(b.due));
   const planned = byDue.map((p) => Object.assign({}, p, { matched: !p.done && !!Fin.matchPlanned(p, out, used) }));
   D = { rev, planned, cats, txs: out, recurring: rec, suggestions, cmap: Fin.catMap(cats), rules };
@@ -241,16 +240,33 @@ window.addEventListener('hashchange', () => { if (drawer.open) drawer.close(); }
 drawer.addEventListener('close', () => $('#menu-btn').focus({ preventScroll: true }));
 
 /* ---------- Navigation: Hash-Routen, Tab-Leiste ---------- */
-const TABS = [
+/* Übergangsweise zwei Oberflächen: „alt“ (wie bisher) und „neu“ (Budget, Übersicht, andere Symbole). Der Schalter steht oben in der Mitte. */
+let uiMode = 'neu';
+try { const m = localStorage.getItem('finanz-ui'); if (m === 'alt' || m === 'neu') uiMode = m; } catch (e) { /* ohne Speicher: neu */ }
+const TABS_ALT = [
   { id: 'heute', label: 'Heute', icon: 'today', href: '#/heute' },
   { id: 'umsaetze', label: 'Umsätze', icon: 'list', href: '#/umsaetze' },
   { id: 'neu', label: 'Neu', icon: 'plus', href: '#/neu', main: true },
   { id: 'plan', label: 'Plan', icon: 'calendar', href: '#/plan' },
   { id: 'einstellungen', label: 'Einstellungen', icon: 'gear', href: '#/einstellungen' },
 ];
-$('#tabbar').innerHTML = `<div class="tabbar-in"><span class="tab-indicator" aria-hidden="true"></span>${TABS.map((t) =>
-  `<a href="${t.href}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}"${t.main ? ' class="tab-new"' : ''}><span class="ico">${t.main ? `<span class="plus">${icon('plus')}</span>` : icon(t.icon)}</span></a>`).join('')}</div>`;
+const TABS_NEU = [
+  { id: 'heute', label: 'Budget', icon: 'wallet', href: '#/heute' },
+  { id: 'umsaetze', label: 'Übersicht', icon: 'pie', href: '#/umsaetze' },
+  { id: 'neu', label: 'Neu', icon: 'plus', href: '#/neu', main: true },
+  { id: 'plan', label: 'Plan', icon: 'calclock', href: '#/plan' },
+  { id: 'einstellungen', label: 'Einstellungen', icon: 'sliders', href: '#/einstellungen' },
+];
 let firstTab = true;
+function buildTabbar() {
+  const tabs = uiMode === 'neu' ? TABS_NEU : TABS_ALT;
+  $('#tabbar').innerHTML = `<div class="tabbar-in"><span class="tab-indicator" aria-hidden="true"></span>${tabs.map((t) =>
+    `<a href="${t.href}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}"${t.main ? ' class="tab-new"' : ''}><span class="ico">${t.main ? `<span class="plus">${icon('plus')}</span>` : icon(t.icon)}</span></a>`).join('')}</div>`;
+  firstTab = true;
+  $$('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === uiMode)));
+}
+buildTabbar();
+function setMode(m) { uiMode = m; try { localStorage.setItem('finanz-ui', m); } catch (e) { /* egal */ } buildTabbar(); render({ force: true }); announce(m === 'neu' ? 'Neue Ansicht' : 'Alte Ansicht'); }
 function placeIndicator() {
   const ind = $('.tab-indicator'), cur = $('.tabbar a[aria-current="page"]'); if (!ind || !cur) return;
   const bar = $('.tabbar-in').getBoundingClientRect(), r = cur.getBoundingClientRect(), w = 60, h = 40;
@@ -265,12 +281,12 @@ function parseRoute() {
   const p = h.split('/').filter(Boolean).map(decodeURIComponent);
   return { name: p[0] || 'heute', a: p[1] || '', b: p[2] || '', path: p };
 }
-const tabOf = (r) => ({ heute: 'heute', umsaetze: 'umsaetze', tx: 'umsaetze', kategorie: 'umsaetze', neu: r.b ? (['geplant', 'fix', 'ziel', 'einzahlung'].includes(r.a) ? 'plan' : 'einstellungen') : 'neu', zuordnen: 'heute', rueckblick: 'heute', plan: 'plan', einstellungen: 'einstellungen' }[r.name] || 'heute');
+const tabOf = (r) => ({ heute: 'heute', umsaetze: 'umsaetze', tx: 'umsaetze', kategorie: 'umsaetze', neu: r.b ? (['geplant', 'fix', 'einkommen', 'ziel', 'einzahlung'].includes(r.a) ? 'plan' : 'einstellungen') : 'neu', zuordnen: 'heute', rueckblick: 'heute', plan: 'plan', einstellungen: 'einstellungen' }[r.name] || 'heute');
 let lastRouteKey = '', draft = null;
 function render(opts = {}) {
   const r = parseRoute(), key = location.hash;
   if (!opts.force && key === lastRouteKey && $('#view form') && !$('#view [data-live]')) return;   // offenes Formular nie neu zeichnen (R9.5)
-  const fn = VIEWS[r.name] || VIEWS.heute;
+  const fn = (uiMode === 'neu' && VIEWS_NEU[r.name]) || VIEWS[r.name] || VIEWS.heute;
   const view = $('#view');
   const html = fn(r) || '';
   const scrollY = window.scrollY, active = document.activeElement, fid = active && active.dataset ? active.dataset.fid : '';
@@ -293,7 +309,7 @@ function render(opts = {}) {
   replayPress();
   if (typeof updateRefresh === 'function') updateRefresh();
 }
-const VIEWS = {}, VIEW_AFTER = {};
+const VIEWS = {}, VIEWS_NEU = {}, VIEW_AFTER = {};
 window.addEventListener('hashchange', () => { draft = null; render(); });
 const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
 

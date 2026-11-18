@@ -300,17 +300,17 @@
      Tageslimit = (Verfügbar − bisher ausgegeben vor heute) / verbleibende Tage inkl. heute.
      Überziehst du heute, sinkt das Limit für alle Folgetage automatisch (die Formel rechnet jeden Tag neu). */
   Fin.catMap = (cats) => { const m = new Map(); for (const c of cats) m.set(c.id, c); return m; };
-  // fixKeys: Händler-Schlüssel übernommener Fixposten; deren Buchungen zählen als Fixkosten, egal in welcher Kategorie sie liegen
-  Fin.isFixedTx = (tx, cmap, fixKeys) => {
+  // Fixkosten-Kategorie (in den Einstellungen → Kategorien einstellbar): Buchungen dort zählen nicht zum Tageslimit
+  Fin.isFixedTx = (tx, cmap) => {
     if (tx.amount >= 0) return false;
     const c = cmap.get(tx.cat);
-    return !!(c && c.fixed) || !!(fixKeys && fixKeys.has(tx.mkey || Fin.merchantKey(tx)));
+    return !!(c && c.fixed);
   };
-  Fin.variableSpend = (tx, cmap, fixKeys) => {
+  Fin.variableSpend = (tx, cmap) => {
     const c = cmap.get(tx.cat) || { kind: tx.amount < 0 ? 'expense' : 'income' };
     if (tx.ignore || tx.autoIgnore || c.kind === 'transfer' || c.kind === 'income') return 0;
     if (c.kind === 'refund') return tx.amount > 0 ? -tx.amount : 0;
-    if (Fin.isFixedTx(tx, cmap, fixKeys)) return 0;
+    if (Fin.isFixedTx(tx, cmap)) return 0;
     return tx.amount < 0 ? -tx.amount : 0;
   };
   // Geplante Zahlung gilt als erledigt, wenn ein passender Umsatz kommt: Betrag ±5 %, Datum ±10 Tage, Name (erstes Wort) kommt vor
@@ -345,27 +345,25 @@
     const ms = per.from, me = per.to, dim = Math.round((dparse(me) - dparse(ms)) / 864e5) + 1;
     const dayNo = Math.round((d - dparse(ms)) / 864e5) + 1, daysLeft = dim - dayNo + 1;
     const active = fixed.filter((f) => f.active !== false && !f.deleted);
-    const fixKeys = new Set(active.filter((f) => f.kind !== 'income' && f.key).map((f) => f.key));
     const income = round2(active.filter((f) => f.kind === 'income').reduce((s, f) => s + Math.abs(f.amount), 0));
-    const fixedPlan = round2(active.filter((f) => f.kind !== 'income').reduce((s, f) => s + Math.abs(f.amount), 0));
-    // Fixkosten je Posten: gebucht im Zeitraum (über den Händler-Schlüssel gefunden), mindestens der Plan-Betrag. Ein Posten, der noch nicht abgebucht wurde, zählt mit seinem Plan-Betrag.
-    // Posten ohne Schlüssel und Fixkosten-Buchungen ohne Posten (zum Beispiel ungeplante Abos) werden gemeinsam verglichen: der höhere Wert gilt.
-    const inP = txs.filter((t) => t.date >= ms && t.date <= me && !t.ignore && !t.autoIgnore && t.amount < 0);
-    let keyedSum = 0, planLoose = 0; const taken = new Set();
-    for (const f of active.filter((x) => x.kind !== 'income')) {
-      if (!f.key) { planLoose += Math.abs(f.amount); continue; }
-      let act = 0; for (const t of inP) if ((t.mkey || Fin.merchantKey(t)) === f.key) act -= t.amount;
-      keyedSum += Math.max(Math.abs(f.amount), act);
-    }
-    let looseActual = 0; for (const t of inP) if (Fin.isFixedTx(t, cmap, fixKeys) && !fixKeys.has(t.mkey || Fin.merchantKey(t))) looseActual -= t.amount;
-    const fixedActual = round2(keyedSum + looseActual);
-    const fixedSum = round2(keyedSum + Math.max(planLoose, looseActual));
+    const expItems = active.filter((f) => f.kind !== 'income');
+    const fixedPlan = round2(expItems.reduce((s, f) => s + Math.abs(f.amount), 0));
+    // Fixkosten gelten je Fixkosten-Kategorie: mindestens die Summe deiner Posten dort, bei höheren Buchungen der gebuchte Betrag
+    // (ungeplante Rechnungen oder zwei Monate auf einmal zählen also, nicht abgebuchte Posten bleiben mit ihrem Betrag stehen).
+    // Posten in einer Kategorie ohne Fixkosten-Flag zählen mit ihrem Betrag, ihre Buchungen bleiben variabel (Kategorie anpassen!).
+    const fixedCats = new Set([...cmap.values()].filter((c) => c.fixed).map((c) => c.id));
+    const planBy = new Map(), actBy = new Map(); let planOther = 0;
+    for (const f of expItems) { if (fixedCats.has(f.cat)) planBy.set(f.cat, (planBy.get(f.cat) || 0) + Math.abs(f.amount)); else planOther += Math.abs(f.amount); }
+    for (const t of txs) if (t.date >= ms && t.date <= me && !t.ignore && !t.autoIgnore && t.amount < 0 && fixedCats.has(t.cat)) actBy.set(t.cat, (actBy.get(t.cat) || 0) - t.amount);
+    let fixedSum = planOther, fixedActual = planOther;
+    for (const c of fixedCats) { fixedSum += Math.max(planBy.get(c) || 0, actBy.get(c) || 0); fixedActual += actBy.get(c) || 0; }
+    fixedSum = round2(fixedSum); fixedActual = round2(fixedActual);
     // Offene geplante Zahlungen: fällig bis Monatsende, auch überfällige (so lange nicht abgehakt oder im Umsatz gefunden)
     const plannedOpen = planned.filter((p) => !p.deleted && !p.done && p.due <= me && !(p.matched));
     const plannedSum = round2(plannedOpen.reduce((s, p) => s + Math.abs(p.amount), 0));
     const savings = round2(Number(settings.savingsTarget) || 0);
     const disposable = round2(income - fixedSum - plannedSum - savings);
-    const spendOn = (a, b) => round2(txs.reduce((s, t) => (t.date >= a && t.date <= b ? s + Fin.variableSpend(t, cmap, fixKeys) : s), 0));
+    const spendOn = (a, b) => round2(txs.reduce((s, t) => (t.date >= a && t.date <= b ? s + Fin.variableSpend(t, cmap) : s), 0));
     const spentMonth = spendOn(ms, today), spentToday = spendOn(today, today), spentBeforeToday = round2(spentMonth - spentToday);
     const limitToday = Math.max(0, round2((disposable - spentBeforeToday) / daysLeft));
     const wStart = Fin.weekStart(today), wEnd = Fin.addDays(wStart, 6);
@@ -439,12 +437,12 @@
   Fin.incomeCheck = ({ txs, fixed = [], settings = {}, today }) => {
     const per = Fin.period(today, settings.periodStart || 1);
     return fixed.filter((f) => !f.deleted && f.active !== false && f.kind === 'income').map((f) => {
-      const plan = Math.abs(f.amount), mine = txs.filter((t) => t.amount > 0 && !t.ignore && !t.autoIgnore && f.key && (t.mkey || Fin.merchantKey(t)) === f.key);
+      const plan = Math.abs(f.amount), m = Fin.fold(f.match || '').trim(), mine = txs.filter((t) => t.amount > 0 && !t.ignore && !t.autoIgnore && m && (t.hay || Fin.haystack(t)).includes(m));
       const now = mine.filter((t) => t.date >= per.from && t.date <= per.to), actual = round2(now.reduce((s, t) => s + t.amount, 0));
       const last = now.length ? now.map((t) => t.date).sort().pop() : (mine.map((t) => t.date).sort().pop() || '');
       let due = per.from; for (let d = per.from; d <= per.to; d = Fin.addDays(d, 1)) if (dparse(d).getDate() === Math.min(f.day, daysInMonth(dparse(d).getFullYear(), dparse(d).getMonth()))) { due = d; break; }
       let status = 'ok';
-      if (!f.key || !mine.length) status = 'unknown';        // noch nie eine passende Zahlung gesehen: Eingang lässt sich nicht prüfen, kein falscher Alarm
+      if (!m || !mine.length) status = 'unknown';        // noch nie eine passende Zahlung gesehen: Eingang lässt sich nicht prüfen, kein falscher Alarm
       else if (actual === 0) status = today > Fin.addDays(due, 7) ? 'late' : 'pending';
       else if (Math.abs(actual - plan) > plan * 0.05) status = 'diff';
       return { id: f.id, name: f.name, plan, actual, diff: round2(actual - plan), last, due, status };

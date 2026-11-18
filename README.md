@@ -8,7 +8,6 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 - **Budget** aus regelmäßigem Einkommen, Fixkosten, geplanten Zahlungen und Sparrate, angezeigt als Tag, Woche und Monat
 - **Tageslimit, das mitdenkt:** Wer heute überzieht, hat an den restlichen Tagen des Monats weniger
 - **Kategorien über feste Regeln** (Aldi, Lidl, Penny, ESSO, Vodafone …) ohne KI und ohne API. PayPal-Zahlungen werden nach dem Händler im Verwendungszweck eingeordnet
-- **Wiederkehrendes erkennen** (Abos, Miete, Strom) und als Fixposten übernehmen
 - **Eigene Regeln:** Was nicht passt, landet unter „Sonstiges“. Dort legst du Regeln an („Verwendungszweck enthält …“ → Kategorie)
 - **Geplante Zahlungen** (PayPal, Klarna in 30 Tagen): werden nur eingetragen, nichts wird übertragen, senken aber schon das Tageslimit
 - **Budget pro Kategorie** mit Warnung ab 80 %, **Sparziele**, **mehrere Konten**, **Umbuchungen** zählen nicht als Ausgabe
@@ -18,6 +17,10 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 - **Berichte:** Monatsvergleich, Ausgaben nach Händler, Export als CSV
 - **Local-first:** Die App arbeitet immer lokal und gleicht angemeldet mit Supabase ab (pro Eintrag gewinnt die jüngere Änderung)
 
+## Oberfläche (Alt/Neu)
+
+Übergangsweise gibt es oben in der Mitte einen Schalter **Alt | Neu**. „Neu“ hat andere Symbole unten und diese Reihenfolge: **Budget** (Zeitraum-Schalter, „Heute übrig“, alle Ein- und Ausgaben des Zeitraums), **Übersicht** (Liste, Kategorien mit Tortendiagramm, Berichte), **Neu**, **Plan** (Fixkosten zuerst) und **Einstellungen**. Fixkosten und Einkommen trägst du selbst ein, es gibt keine automatische Erkennung wiederkehrender Zahlungen mehr, nur die Kategorien-Erkennung.
+
 ## So rechnet das Budget
 
 ```
@@ -25,7 +28,7 @@ Verfügbar im Monat = Einnahmen (Plan) − Fixkosten − offene geplante Zahlung
 Tageslimit heute   = (Verfügbar − bisher variabel ausgegeben vor heute) ÷ verbleibende Tage inkl. heute
 ```
 
-Variabel ist jede Ausgabe in einer Kategorie, die nicht als Fixkosten markiert ist. Umbuchungen zählen nirgends, Erstattungen mindern die Ausgaben. Die Formel wird jeden Tag neu gerechnet, deshalb sinkt das Limit automatisch, wenn du überziehst. Die Logik steht in [`core.js`](core.js) und ist in `tests/core.test.js` getestet.
+Variabel ist jede Ausgabe in einer Kategorie, die nicht als Fixkosten markiert ist. Fixkosten gelten je Fixkosten-Kategorie: mindestens die Summe deiner Posten dort, bei höheren Buchungen der gebuchte Betrag. Umbuchungen zählen nirgends, Erstattungen mindern die Ausgaben. Die Formel wird jeden Tag neu gerechnet, deshalb sinkt das Limit automatisch, wenn du überziehst. Die Logik steht in [`core.js`](core.js) und ist in `tests/core.test.js` getestet.
 
 ## Mit Habits verbunden
 
