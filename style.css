@@ -461,6 +461,12 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 @media (max-width: 359px) { .hero .big { font-size: 2.25rem; } .sum3 { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
 
+#refresh-btn { margin-left: auto; }
+.topbar { justify-content: space-between; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#refresh-btn.spin .ic { animation: spin 900ms linear infinite; }
+@media (prefers-reduced-motion: reduce) { #refresh-btn.spin .ic { animation: none; } #refresh-btn.spin { opacity: .5; } }
+
 /* Bausteine aus Habits, die oben nicht mitkopiert wurden */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s4); display: grid; gap: var(--s3); }
 .panel p { font-size: .9375rem; color: var(--muted); }

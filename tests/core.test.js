@@ -127,5 +127,24 @@ t('Budget: Ist über Plan bei Fixkosten nimmt den höheren Wert', () => {
   const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -80, cat: 'abos', name: 'x' }], today: '2026-11-03' });
   assert.equal(b.fixed, 80);
 });
+t('Budgetzeitraum ab Tag 30', () => {
+  assert.deepEqual(Fin.period('2026-11-18', 30), { from: '2026-10-30', to: '2026-11-29' });
+  assert.deepEqual(Fin.period('2026-11-30', 30), { from: '2026-11-30', to: '2026-12-29' });
+  assert.deepEqual(Fin.period('2027-02-10', 30), { from: '2027-01-30', to: '2027-02-27' });     // Februar: Start am 28.
+  assert.deepEqual(Fin.period('2027-02-28', 30), { from: '2027-02-28', to: '2027-03-29' });
+  assert.deepEqual(Fin.period('2026-01-05', 30), { from: '2025-12-30', to: '2026-01-29' });
+  assert.deepEqual(Fin.period('2026-11-18', 1), { from: '2026-11-01', to: '2026-11-30' });
+});
+t('Budget mit Start am 30.: Ausgaben ab 30.10. zählen, davor nicht, Resttage stimmen', () => {
+  const txs = [{ date: '2026-10-29', amount: -500, cat: 'essen' }, { date: '2026-10-31', amount: -40, cat: 'essen' }];
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 590 }], planned: [], settings: { periodStart: 30 }, txs, today: '2026-11-18' });
+  assert.equal(b.from, '2026-10-30'); assert.equal(b.to, '2026-11-29'); assert.equal(b.dim, 31); assert.equal(b.daysLeft, 12);
+  assert.equal(b.month.spent, 40); assert.equal(b.day.limit, Fin.round2((590 - 40) / 12));
+});
+t('Unterhalt um den 30./1. wird als wiederkehrend erkannt (auch bei zwei Zahlungen im selben Monat)', () => {
+  const mk = (d) => ({ id: d, date: d, amount: 590, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'sonstige-einnahmen', label: '' });
+  const rec = Fin.detectRecurring([mk('2026-09-01'), mk('2026-10-01'), mk('2026-10-30')]);
+  assert.equal(rec.length, 1); assert.equal(rec[0].kind, 'income'); assert.equal(rec[0].amount, 590);
+});
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);

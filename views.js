@@ -53,14 +53,14 @@ VIEWS.heute = (r) => {
   const range = ['tag', 'woche', 'monat'].includes(r.a) ? r.a : 'tag';
   const d = derived(), b = budget(), st = settings(), t = todayKey();
   const hasPlan = b.income > 0;
-  const R = { tag: { cap: 'Heute übrig', v: b.day, name: 'Tageslimit', unit: 'heute' }, woche: { cap: 'Diese Woche übrig', v: b.week, name: 'Wochenbudget', unit: 'diese Woche' }, monat: { cap: `${MONTHS[Number(t.slice(5, 7)) - 1]} übrig`, v: b.month, name: 'Monatsbudget', unit: 'diesen Monat' } }[range];
+  const R = { tag: { cap: 'Heute übrig', v: b.day, name: 'Tageslimit', unit: 'heute' }, woche: { cap: 'Diese Woche übrig', v: b.week, name: 'Wochenbudget', unit: 'diese Woche' }, monat: { cap: 'Budgetmonat übrig', v: b.month, name: 'Monatsbudget', unit: 'diesen Budgetmonat' } }[range];
   const budgetV = range === 'tag' ? b.day.limit : R.v.budget, left = R.v.left, spent = R.v.spent;
   const p = pct(spent, budgetV);
   let state = `<span class="state ok">${icon('check')}Im Budget</span>`;
   if (!hasPlan) state = `<span class="state">${icon('info')}Noch kein Einkommen. <a href="#/plan/fix" style="color:var(--accent);font-weight:700">Eintragen</a></span>`;
   else if (left < 0) state = `<span class="state bad">${icon('alert')}${esc(R.unit === 'heute' ? 'Heute' : R.unit === 'diese Woche' ? 'Diese Woche' : 'Im Monat')} um ${eur(-left)} überschritten</span>`;
   else if (p >= st.warnAt) state = `<span class="state warn">${icon('alert')}Fast aufgebraucht (${p} %)</span>`;
-  const slot = range === 'tag' ? (b.tomorrow == null ? 'Morgen: Monatsende' : `Morgen: ${eur(b.tomorrow)}`) : range === 'woche' ? `Noch ${b.daysLeftWeek} ${b.daysLeftWeek === 1 ? 'Tag' : 'Tage'} in dieser Woche` : `Noch ${b.daysLeft} ${b.daysLeft === 1 ? 'Tag' : 'Tage'} im Monat`;
+  const slot = range === 'tag' ? (b.tomorrow == null ? 'Morgen: neuer Budgetmonat' : `Morgen: ${eur(b.tomorrow)}`) : range === 'woche' ? `Noch ${b.daysLeftWeek} ${b.daysLeftWeek === 1 ? 'Tag' : 'Tage'} in dieser Woche` : `${dateShort(b.from)} – ${dateShort(b.to)}, noch ${b.daysLeft} ${b.daysLeft === 1 ? 'Tag' : 'Tage'}`;
   const hero = `<section class="hero" aria-label="Budget ${R.unit}"><div class="cap">${esc(R.cap)}</div>
     <div class="big ${left < 0 ? 'over' : ''}">${hasPlan ? eur(left) : eur(0)}</div>
     <div class="sub"><span>${esc(R.name)} ${hasPlan ? eur(budgetV) : '–'}</span><span>Ausgegeben ${eur(spent)}</span><span>${esc(slot)}</span></div>
@@ -71,16 +71,17 @@ VIEWS.heute = (r) => {
     ...live('fixed').filter((x) => x.active !== false && x.kind !== 'income').map((x) => ({ k: 'fix', id: x.id, name: x.name, amount: -Math.abs(x.amount), date: Fin.nextDue(x.day, t) })).filter((x) => x.date <= Fin.addDays(t, 14)),
   ].sort((a, c) => a.date.localeCompare(c.date)).slice(0, 5);
   const warns = d.cats.filter((c) => c.budget > 0).map((c) => {
-    const [a, z] = monthRange(t.slice(0, 7)); const sp = (Fin.byCategory(d.txs, d.cats, a, z).find((x) => x.id === c.id) || { total: 0 }).total;
+    const a = b.from, z = b.to; const sp = (Fin.byCategory(d.txs, d.cats, a, z).find((x) => x.id === c.id) || { total: 0 }).total;
     return { c, sp, p: pct(sp, c.budget) };
   }).filter((x) => x.p >= st.warnAt).sort((a, c) => c.p - a.p);
+  const bankNote = bankStatus();
   const unsorted = d.txs.filter((x) => x.cat === 'sonstiges' && !x.ignore).length;
   const accts = live('acct').filter((a) => a.balance != null);
   return `<div class="view-wrap">
     ${pageHead('Finanzen', { sub: dateLong(t) })}
     ${seg([{ id: 'tag', label: 'Tag', href: '#/heute/tag' }, { id: 'woche', label: 'Woche', href: '#/heute/woche' }, { id: 'monat', label: 'Monat', href: '#/heute/monat' }], range, 'Zeitraum')}
     ${hero}
-    <section class="section" style="margin-top:0"><h2>So entsteht dein Monatsbudget</h2>
+    <section class="section" style="margin-top:0"><h2>So entsteht dein Budget</h2>
       <dl class="kv"><div><dt>Einnahmen (Plan)</dt><dd>${eur(b.income)}</dd></div><div><dt>− Fixkosten</dt><dd>${eur(b.fixed)}</dd></div>
       <div><dt>− Geplante Zahlungen</dt><dd>${eur(b.planned)}</dd></div><div><dt>− Sparrate</dt><dd>${eur(b.savings)}</dd></div>
       <div class="total"><dt class="k">Verfügbar</dt><dd>${eur(b.disposable)}</dd></div></dl>
@@ -90,6 +91,7 @@ VIEWS.heute = (r) => {
     <section class="section"><h2>Aufräumen</h2><div class="list-block">
       <a class="row-link-card" href="#/zuordnen"><span class="info"><span class="name">Sonstiges zuordnen</span><br><span class="meta">${unsorted ? unsorted + (unsorted === 1 ? ' Umsatz wartet' : ' Umsätze warten') : 'Alles zugeordnet'}</span></span>${icon('right')}</a>
       <a class="row-link-card" href="#/plan/fix"><span class="info"><span class="name">Wiederkehrende Zahlungen</span><br><span class="meta">${d.suggestions.length ? d.suggestions.length + ' erkannt, als Fixposten übernehmen' : 'Keine neuen erkannt'}</span></span>${icon('right')}</a>
+      <a class="row-link-card" href="#/einstellungen/bank"><span class="info"><span class="name">Bank-Freigabe</span><br><span class="meta ${bankNote.cls}">${esc(bankNote.text)}</span></span>${icon('right')}</a>
       <a class="row-link-card" href="#/umsaetze/kategorien"><span class="info"><span class="name">Kategorie-Budgets</span><br><span class="meta ${warns.length ? 'warn-text' : ''}">${warns.length ? warns.map((w) => `${esc(w.c.name)} ${w.p} %`).join(', ') : 'Keine Warnungen'}</span></span>${icon('right')}</a></div></section>
     <section class="section"><h2>Kontostand</h2>${accts.length ? `<dl class="kv">${accts.map((a) => `<div><dt>${esc(a.name)}</dt><dd>${eur(a.balance)}</dd></div>`).join('')}</dl><p class="hint-line">Stand der letzten Buchung${accts[0].balanceDate ? ' (' + dateShort(accts[0].balanceDate) + ')' : ''}.</p>` : `<p class="hint-line">Noch kein Konto. Importiere deine Umsätze als CSV oder verbinde die Bank.</p><a class="btn" href="#/einstellungen/bank">${icon('landmark')}Bank & Import</a>`}</section></div>`;
 };
@@ -213,6 +215,7 @@ VIEWS.tx = (r) => {
         <p class="hint-line">Die Regel gilt für alle bisherigen und künftigen Umsätze und geht vor den festen Regeln.</p></div>
       <label class="switch-row"><input type="checkbox" id="f-ignore"${t.ignore ? ' checked' : ''}> Nicht im Budget zählen</label>
       <div class="actions"><button type="submit" class="btn primary" style="flex:1">Speichern</button></div>
+      <button type="button" class="btn" data-act="tx-to-fixed" data-id="${esc(t.id)}">${icon('repeat')}${t.amount > 0 ? 'Als regelmäßiges Einkommen eintragen' : 'Als Fixposten eintragen'}</button>
       ${t.manualEntry ? `<button type="button" class="btn danger" data-act="del-tx" data-id="${esc(t.id)}">Umsatz löschen</button>` : ''}
     </form></div>`;
 };
@@ -240,3 +243,16 @@ VIEWS.zuordnen = () => {
   return `<div class="view-wrap">${pageHead('Zuordnen', { back: '#/heute', backLabel: 'Zurück', sub: 'Umsätze unter „Sonstiges“, nach Händler gruppiert' })}
     ${zGroups.length ? `<div class="list-block">${zGroups.slice(0, 40).map(card).join('')}</div>` : emptyBlock('Alles zugeordnet', 'Kein Umsatz liegt unter „Sonstiges“.', '<a class="btn" href="#/heute">Zurück</a>')}</div>`;
 };
+
+/* Zustand der Bank-Freigabe für die Anzeige (Heute, Einstellungen): Text und Warnstufe */
+function bankStatus() {
+  if (bankUI.state === 'login') return { text: 'Anmelden, um die Bank zu nutzen', cls: '' };
+  if (bankUI.state !== 'ready') return { text: bankUI.state === 'off' ? 'Noch nicht eingerichtet' : 'Wird geladen …', cls: '' };
+  const act = bankUI.links.filter((l) => l.status === 'active' || l.status === 'expired');
+  if (!act.length) return { text: 'Keine Bank verbunden', cls: '' };
+  const days = act.map((l) => (l.valid_until ? Math.ceil((new Date(l.valid_until) - Date.now()) / 864e5) : 999));
+  const min = Math.min(...days);
+  if (min <= 0 || act.some((l) => l.status === 'expired')) return { text: 'Freigabe abgelaufen, bitte erneuern', cls: 'over-text' };
+  if (min <= 7) return { text: `Freigabe läuft in ${min} ${min === 1 ? 'Tag' : 'Tagen'} ab, bitte erneuern`, cls: 'warn-text' };
+  return { text: min >= 999 ? 'Verbunden' : `Verbunden, Freigabe noch ${min} Tage`, cls: '' };
+}

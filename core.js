@@ -194,7 +194,7 @@
       const months = new Set(items.map((i) => i.date.slice(0, 7)));
       const fixedCat = ['abos', 'wohnen', 'telefon', 'versicherung'].includes(items[items.length - 1].cat);
       const minN = fixedCat ? 2 : 3;                                  // bekannte Fixkosten-Kategorien genügen schon mit zwei Monaten
-      if (items.length < minN || months.size < minN) continue;
+      if (items.length < minN) continue;
       const sign = Math.sign(items[items.length - 1].amount);
       const same = items.filter((i) => Math.sign(i.amount) === sign);
       if (same.length < minN) continue;
@@ -329,11 +329,20 @@
     if (/^(dz bank|nexi|payone|concardis|worldline|visa|mastercard|sumup|stripe)\b/i.test(name)) return '';
     return name;
   };
+  // Budgetzeitraum: beginnt am Tag startDay (zum Beispiel 30, wenn der Unterhalt um den 30. kommt). Kürzere Monate nutzen ihren letzten Tag.
+  Fin.periodStart = (y, m, startDay) => dkey(new Date(y, m, Math.min(Math.max(1, Math.round(startDay) || 1), daysInMonth(y, m))));
+  Fin.period = (today, startDay = 1) => {
+    const d = dparse(today), y = d.getFullYear(), m = d.getMonth();
+    const thisStart = Fin.periodStart(y, m, startDay);
+    const from = today >= thisStart ? thisStart : Fin.periodStart(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1, startDay);
+    const nextStart = today >= thisStart ? Fin.periodStart(m === 11 ? y + 1 : y, m === 11 ? 0 : m + 1, startDay) : thisStart;
+    return { from, to: Fin.addDays(nextStart, -1) };
+  };
   Fin.budget = ({ txs, cats, fixed = [], planned = [], settings = {}, today }) => {
     const cmap = Fin.catMap(cats);
-    const d = dparse(today), y = d.getFullYear(), m = d.getMonth(), dim = daysInMonth(y, m);
-    const mk = today.slice(0, 7), ms = mk + '-01', me = `${mk}-${pad(dim)}`;
-    const dayNo = d.getDate(), daysLeft = dim - dayNo + 1;
+    const d = dparse(today), per = Fin.period(today, settings.periodStart || 1);
+    const ms = per.from, me = per.to, dim = Math.round((dparse(me) - dparse(ms)) / 864e5) + 1;
+    const dayNo = Math.round((d - dparse(ms)) / 864e5) + 1, daysLeft = dim - dayNo + 1;
     const active = fixed.filter((f) => f.active !== false && !f.deleted);
     const fixKeys = new Set(active.filter((f) => f.kind !== 'income' && f.key).map((f) => f.key));
     const income = round2(active.filter((f) => f.kind === 'income').reduce((s, f) => s + Math.abs(f.amount), 0));
@@ -356,7 +365,7 @@
     const weekBudget = round2(spentWeekBefore + limitToday * daysLeftWeek);
     const pace = dayNo > 0 ? spentMonth / dayNo : 0;
     return {
-      today, dim, dayNo, daysLeft, daysLeftWeek, income, fixed: fixedSum, fixedPlan, fixedActual, planned: plannedSum, savings, disposable,
+      today, from: ms, to: me, dim, dayNo, daysLeft, daysLeftWeek, income, fixed: fixedSum, fixedPlan, fixedActual, planned: plannedSum, savings, disposable,
       month: { budget: disposable, spent: spentMonth, left: round2(disposable - spentMonth) },
       week: { budget: weekBudget, spent: spentWeek, left: round2(weekBudget - spentWeek), from: wFrom, to: wTo },
       day: { limit: limitToday, spent: spentToday, left: round2(limitToday - spentToday) },

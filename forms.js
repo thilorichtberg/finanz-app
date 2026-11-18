@@ -128,9 +128,9 @@ const FORM_DEFS = {
       fields: [{ n: 'amount', t: 'money', l: 'Betrag', neg: true }],
       save: (v) => { put('goal', Object.assign({}, g, { saved: Math.max(0, Fin.round2(g.saved + v.amount)) })); return { to: '#/plan/ziele', msg: `${eur(Math.abs(v.amount))} ${v.amount > 0 ? 'eingezahlt' : 'ausgezahlt'}` }; } }; },
   budget: () => { const s = settings();
-    return { title: 'Budget & Sparrate', back: '#/einstellungen', intro: 'Einkommen und Fixkosten trägst du unter Plan → Fixkosten ein.', values: { savingsTarget: s.savingsTarget || '0', warnAt: s.warnAt },
-      fields: [{ n: 'savingsTarget', t: 'money', l: 'Sparrate pro Monat', zero: true, hint: 'Wird vor dem Tagesbudget zurückgelegt.' }, { n: 'warnAt', t: 'num', l: 'Warnen ab (Prozent)', min: 50, max: 100, err: 'Bitte eine Zahl zwischen 50 und 100.', hint: 'Gilt für das Tages-, Wochen- und Kategorie-Budget.' }],
-      save: (v) => { setSettings({ savingsTarget: v.savingsTarget, warnAt: v.warnAt }); return { to: '#/einstellungen', msg: 'Gespeichert' }; } }; },
+    return { title: 'Budget & Sparrate', back: '#/einstellungen', intro: 'Einkommen und Fixkosten trägst du unter Plan → Fixkosten ein.', values: { savingsTarget: s.savingsTarget || '0', warnAt: s.warnAt, periodStart: s.periodStart || 1 },
+      fields: [{ n: 'periodStart', t: 'day', l: 'Budgetmonat beginnt am Tag', hint: 'Zum Beispiel 30, wenn dein Geld um den 30. kommt. Dann läuft der Budgetmonat vom 30. bis zum 29. Kürzere Monate nutzen ihren letzten Tag.' }, { n: 'savingsTarget', t: 'money', l: 'Sparrate pro Monat', zero: true, hint: 'Wird vor dem Tagesbudget zurückgelegt.' }, { n: 'warnAt', t: 'num', l: 'Warnen ab (Prozent)', min: 50, max: 100, err: 'Bitte eine Zahl zwischen 50 und 100.', hint: 'Gilt für das Tages-, Wochen- und Kategorie-Budget.' }],
+      save: (v) => { setSettings({ savingsTarget: v.savingsTarget, warnAt: v.warnAt, periodStart: v.periodStart }); return { to: '#/einstellungen', msg: 'Gespeichert' }; } }; },
 };
 
 document.addEventListener('input', (e) => {
@@ -212,9 +212,9 @@ VIEWS.einstellungen = (r) => {
   const st = settings(), d = derived();
   return `<div class="view-wrap">${pageHead('Einstellungen')}<div class="list-block">
     ${ST('#/einstellungen/konto', 'user', 'Konto & Cloud', cloud.user ? 'Angemeldet, Abgleich ' + (cloud.state === 'ok' ? 'aktuell' : cloud.state === 'error' ? 'fehlgeschlagen' : cloud.state === 'busy' ? 'läuft …' : 'bereit') : sb ? 'Nicht angemeldet, Daten nur auf diesem Gerät' : 'Cloud nicht verfügbar')}
-    ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', bankUI.state === 'ready' ? (bankUI.links.some((l) => l.status === 'active') ? 'Bank verbunden, CSV importieren' : 'Bank verbinden, CSV importieren') : 'CSV importieren, Bank verbinden', bankUI.state === 'login' ? '<span class="badge warn">Anmelden</span>' : bankUI.state === 'off' ? '<span class="badge">Bank bald</span>' : '')}
+    ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', bankUI.state === 'ready' ? bankStatus().text : 'CSV importieren, Bank verbinden', bankUI.state === 'login' ? '<span class="badge warn">Anmelden</span>' : bankUI.state === 'off' ? '<span class="badge">Bank bald</span>' : '')}
     ${ST('#/einstellungen/konten', 'wallet', 'Konten', `${live('acct').length} ${live('acct').length === 1 ? 'Konto' : 'Konten'}`)}
-    ${ST('#/einstellungen/budget', 'target', 'Budget & Sparrate', `Sparrate ${eur(st.savingsTarget)} · Warnung ab ${st.warnAt} %`)}
+    ${ST('#/einstellungen/budget', 'target', 'Budget & Sparrate', `Budgetmonat ab dem ${st.periodStart || 1}. · Sparrate ${eur(st.savingsTarget)}`)}
     ${ST('#/einstellungen/kategorien', 'layers', 'Kategorien', `${d.cats.length} Kategorien, Budgets pro Kategorie`)}
     ${ST('#/einstellungen/regeln', 'tag', 'Eigene Regeln', `${live('rule').length} ${live('rule').length === 1 ? 'Regel' : 'Regeln'} für die Zuordnung`)}</div>
     <section class="section"><h2>Backup</h2><div class="panel"><p>Sichere alle Daten dieses Geräts als Datei oder spiele ein Backup zurück.</p><div class="btn-row"><button type="button" class="btn" data-act="export-json">${icon('download')}Exportieren</button><button type="button" class="btn" data-act="import-json">${icon('upload')}Importieren</button></div></div></section>
@@ -248,7 +248,7 @@ function setBank() {
   const st = bankUI.state, links = bankUI.links;
   const linkRow = (l) => { const exp = l.valid_until ? Math.ceil((new Date(l.valid_until) - Date.now()) / 864e5) : null;
     return `<div><dt>${esc(l.institution)}<br><span class="hint-line">${l.status === 'active' ? (exp != null ? (exp > 0 ? `Freigabe noch ${exp} Tage` : 'Freigabe abgelaufen') : 'Aktiv') : l.status === 'pending' ? 'Freigabe nicht abgeschlossen' : l.status === 'expired' ? 'Freigabe abgelaufen' : 'Fehler'}${l.last_sync ? ' · Abruf ' + new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(l.last_sync)) : ''}</span></dt>
-      <dd><span class="badge ${l.status === 'active' && (exp == null || exp > 7) ? 'ok' : 'warn'}">${l.status === 'active' ? (exp != null && exp <= 7 ? 'Bald erneuern' : 'Aktiv') : l.status === 'pending' ? 'Offen' : 'Erneuern'}</span></dd></div>`; };
+      <dd>${(l.status !== 'active' || (exp != null && exp <= 7)) && l.status !== 'pending' ? `<button type="button" class="btn small" data-act="bank-start" data-k="${esc(l.institution)}"${bankUI.busy ? ' disabled' : ''}>Erneuern</button>` : `<span class="badge ${l.status === 'active' ? 'ok' : 'warn'}">${l.status === 'active' ? 'Aktiv' : 'Offen'}</span>`}</dd></div>`; };
   let direct;
   if (st === 'login') direct = `<p>Melde dich an, damit die App die Bank über deinen Supabase-Server verbinden kann.</p><a class="btn" href="#/einstellungen/konto">Zur Anmeldung</a>`;
   else if (st === 'off') direct = `<p>Die Anbindung ist vorbereitet, aber auf dem Server noch nicht eingeschaltet. Bis dahin kannst du die CSV-Datei nutzen.</p><button type="button" class="btn" disabled>${icon('link')}Bank verbinden</button>`;

@@ -291,6 +291,7 @@ function render(opts = {}) {
   lastRouteKey = key;
   if (VIEW_AFTER[r.name]) VIEW_AFTER[r.name](r, view);
   replayPress();
+  if (typeof updateRefresh === 'function') updateRefresh();
 }
 const VIEWS = {}, VIEW_AFTER = {};
 window.addEventListener('hashchange', () => { draft = null; render(); });

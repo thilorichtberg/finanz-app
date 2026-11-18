@@ -12,6 +12,8 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 - **Eigene Regeln:** Was nicht passt, landet unter „Sonstiges“. Dort legst du Regeln an („Verwendungszweck enthält …“ → Kategorie)
 - **Geplante Zahlungen** (PayPal, Klarna in 30 Tagen): werden nur eingetragen, nichts wird übertragen, senken aber schon das Tageslimit
 - **Budget pro Kategorie** mit Warnung ab 80 %, **Sparziele**, **mehrere Konten**, **Umbuchungen** zählen nicht als Ausgabe
+- **Budgetmonat ab Tag X** (zum Beispiel 30, wenn der Unterhalt um den 30. kommt) unter Einstellungen → Budget
+- **Bank-Anbindung** über Enable Banking (Edge Function `bank-sync`): Abruf von Hand (Knopf oben rechts, mit Rückfrage) und täglich automatisch um 06:00/07:00 Uhr (`supabase/bank-cron.sql`). PSD2 erlaubt automatische Abrufe nur 4-mal pro Tag und Bank. Die Freigabe läuft nach einigen Wochen ab, die App warnt 7 Tage vorher
 - **Berichte:** Monatsvergleich, Ausgaben nach Händler, Export als CSV
 - **Local-first:** Die App arbeitet immer lokal und gleicht angemeldet mit Supabase ab (pro Eintrag gewinnt die jüngere Änderung)
 
@@ -39,7 +41,7 @@ Beide Apps liegen unter derselben Adresse `thilorichtberg.github.io` (Habits unt
 | `sw.js`, `manifest.webmanifest`, Icons | Offline, Updates, Installierbarkeit |
 | `vendor/supabase.js` | supabase-js 2.45.4, lokal eingebunden |
 | `supabase/finanz.sql` | Tabelle `fin_items` mit Row Level Security |
-| `supabase/bank.sql`, `supabase/functions/bank-sync/` | Schablone für die Bank-Anbindung (noch nicht aktiv) |
+| `supabase/bank.sql`, `supabase/bank-cron.sql`, `supabase/functions/bank-sync/` | Bank-Anbindung: Tabelle, Tageszeitplan, Edge Function |
 | `tests/` | Logik-Tests (`node tests/core.test.js`) und Oberflächen-Prüfung (`tests/ui-check.js`) |
 | `tools/stamp.py` | stempelt vor jeder Veröffentlichung eine neue Version |
 

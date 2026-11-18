@@ -45,8 +45,8 @@ async function bankJwt() {
   const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', await signingKey(), new TextEncoder().encode(`${head}.${body}`));
   return `${head}.${body}.${b64url(sig)}`;
 }
-async function eb(method: string, path: string, body?: unknown) {
-  const res = await fetch(API + path, { method, headers: { authorization: `Bearer ${await bankJwt()}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+async function eb(method: string, path: string, body?: unknown, extra: Record<string, string> = {}) {
+  const res = await fetch(API + path, { method, headers: { authorization: `Bearer ${await bankJwt()}`, 'content-type': 'application/json', ...extra }, body: body ? JSON.stringify(body) : undefined });
   const text = await res.text(); let data: any = {}; try { data = JSON.parse(text); } catch { /* leer */ }
   if (!res.ok) throw new Error(`Bank-Anbieter ${res.status}: ${data.message || data.error || text.slice(0, 200)}`);
   return data;
@@ -62,6 +62,48 @@ const hash = (str: string) => {   // cyrb53, identisch zu Fin.hash
 };
 const acctId = (iban: string, uid: string) => 'acc_' + hash(iban ? iban.replace(/\s/g, '') : uid);
 const day = (d: Date) => d.toISOString().slice(0, 10);
+
+/* Holt neue Umsätze und den Kontostand für die Verbindungen eines Nutzers. psu: Kopfzeilen des Nutzers, wenn er den Abruf selbst ausgelöst hat
+   (gilt dann als „Nutzer ist anwesend“; automatische Abrufe sind pro Bank auf 4 am Tag begrenzt, wir machen 1). */
+async function syncLinks(db: ReturnType<typeof createClient>, userId: string, links: any[], full: boolean, psu: Record<string, string>) {
+      let added = 0; const problems: string[] = [];
+      for (const link of links || []) {
+        if (link.valid_until && new Date(link.valid_until) < new Date()) { await db.from('fin_bank_links').update({ status: 'expired' }).eq('id', link.id); problems.push(`${link.institution}: Zugriff abgelaufen, bitte neu verbinden`); continue; }
+        const from = day(new Date(link.last_sync && !full ? new Date(link.last_sync).getTime() - 10 * 864e5 : Date.now() - (full ? 365 : 90) * 864e5));
+        // Schon vorhandene Umsätze (zum Beispiel aus dem CSV-Import) nicht doppelt anlegen: gleiche Konto/Datum/Betrag-Kombination zählt als vorhanden
+        const { data: have } = await db.from('fin_items').select('id,data').eq('user_id', userId).eq('kind', 'tx').gte('data->>date', from);
+        const seen = new Map<string, number>(); for (const h of have || []) { const k = `${h.data.acct}|${h.data.date}|${Number(h.data.amount).toFixed(2)}`; seen.set(k, (seen.get(k) || 0) + 1); }
+        for (const acc of link.accounts || []) {
+          const aid = acctId(acc.iban, acc.uid), rows: any[] = []; let key: string | undefined; let guard = 0;
+          do {
+            const page = await eb('GET', `/accounts/${acc.uid}/transactions?date_from=${from}&transaction_status=BOOK${key ? '&continuation_key=' + encodeURIComponent(key) : ''}`, undefined, psu);
+            for (const t of page.transactions || []) {
+              const debit = t.credit_debit_indicator === 'DBIT', amount = (debit ? -1 : 1) * Number(t.transaction_amount?.amount || 0);
+              const date = t.booking_date || t.value_date || t.transaction_date; if (!date || !amount) continue;
+              const k = `${aid}|${date}|${amount.toFixed(2)}`; if ((seen.get(k) || 0) > 0) { seen.set(k, seen.get(k)! - 1); continue; }
+              const other = debit ? t.creditor : t.debtor, otherAcc = debit ? t.creditor_account : t.debtor_account;
+              const ref = t.entry_reference || t.transaction_id || hash(`${date}|${amount}|${(t.remittance_information || []).join(' ')}`);
+              rows.push({ user_id: userId, kind: 'tx', id: 'bk_' + hash(`${aid}|${ref}`), updated: Date.now(), deleted: false,
+                data: { id: 'bk_' + hash(`${aid}|${ref}`), acct: aid, date, amount, name: other?.name || '', purpose: (t.remittance_information || []).join(' '), type: t.bank_transaction_code?.description || '', iban: otherAcc?.iban || '', src: 'bank' } });
+            }
+            key = page.continuation_key || undefined;
+          } while (key && ++guard < 40);
+          if (rows.length) { const { error } = await db.from('fin_items').upsert(rows, { onConflict: 'user_id,kind,id', ignoreDuplicates: true }); if (error) throw error; added += rows.length; }
+          // Kontostand
+          try {
+            const bal = (await eb('GET', `/accounts/${acc.uid}/balances`, undefined, psu)).balances || [];
+            const b = bal.find((x: any) => ['CLBD', 'ITBD', 'XPCD'].includes(x.balance_type)) || bal[0];
+            if (b) {
+              const { data: ex } = await db.from('fin_items').select('data').eq('user_id', userId).eq('kind', 'acct').eq('id', aid).maybeSingle();
+              const data = { ...(ex?.data || { id: aid, name: acc.name || link.institution, iban: acc.iban, bank: link.institution, kind: 'giro' }), balance: Number(b.balance_amount?.amount), balanceDate: day(new Date()) };
+              await db.from('fin_items').upsert({ user_id: userId, kind: 'acct', id: aid, data, updated: Date.now(), deleted: false }, { onConflict: 'user_id,kind,id' });
+            }
+          } catch (e) { problems.push(`${link.institution}: Kontostand nicht abrufbar`); }
+        }
+        await db.from('fin_bank_links').update({ last_sync: new Date().toISOString(), error: null }).eq('id', link.id);
+      }
+  return { added, problems };
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors(req) });
@@ -84,6 +126,17 @@ Deno.serve(async (req) => {
       const upd = await db.from('fin_bank_links').update({ status: 'active', state: null, session_id: session.session_id, accounts, valid_until: validUntil, error: null }).eq('id', link.id);
       if (upd.error) return back(false, 'Speichern fehlgeschlagen');
       return back(true);
+    }
+
+    /* ---- Täglicher Abruf durch den Zeitplan (pg_cron), geschützt durch ein Geheimwort ---- */
+    if (req.headers.get('x-cron-secret')) {
+      const secret = Deno.env.get('FIN_CRON_SECRET');
+      if (!secret || req.headers.get('x-cron-secret') !== secret) return json(req, { ok: false, error: 'unauthorized' }, 401);
+      const { data: all } = await db.from('fin_bank_links').select('*').eq('status', 'active');
+      const byUser = new Map<string, any[]>(); for (const l of all || []) byUser.set(l.user_id, [...(byUser.get(l.user_id) || []), l]);
+      let added = 0; const problems: string[] = [];
+      for (const [uid, ls] of byUser) { try { const r = await syncLinks(db, uid, ls, false, {}); added += r.added; problems.push(...r.problems); } catch (e) { problems.push(String((e as Error).message || e)); } }
+      return json(req, { ok: true, users: byUser.size, added, problems });
     }
 
     /* ---- Aufrufe der App (mit Supabase-Login) ---- */
@@ -116,43 +169,10 @@ Deno.serve(async (req) => {
     }
     if (input.action === 'sync') {
       const { data: links } = await db.from('fin_bank_links').select('*').eq('user_id', userId).eq('status', 'active');
-      let added = 0; const problems: string[] = [];
-      for (const link of links || []) {
-        if (link.valid_until && new Date(link.valid_until) < new Date()) { await db.from('fin_bank_links').update({ status: 'expired' }).eq('id', link.id); problems.push(`${link.institution}: Zugriff abgelaufen, bitte neu verbinden`); continue; }
-        const from = day(new Date(link.last_sync && !input.full ? new Date(link.last_sync).getTime() - 10 * 864e5 : Date.now() - (input.full ? 365 : 90) * 864e5));
-        // Schon vorhandene Umsätze (zum Beispiel aus dem CSV-Import) nicht doppelt anlegen: gleiche Konto/Datum/Betrag-Kombination zählt als vorhanden
-        const { data: have } = await db.from('fin_items').select('id,data').eq('user_id', userId).eq('kind', 'tx').gte('data->>date', from);
-        const seen = new Map<string, number>(); for (const h of have || []) { const k = `${h.data.acct}|${h.data.date}|${Number(h.data.amount).toFixed(2)}`; seen.set(k, (seen.get(k) || 0) + 1); }
-        for (const acc of link.accounts || []) {
-          const aid = acctId(acc.iban, acc.uid), rows: any[] = []; let key: string | undefined; let guard = 0;
-          do {
-            const page = await eb('GET', `/accounts/${acc.uid}/transactions?date_from=${from}&transaction_status=BOOK${key ? '&continuation_key=' + encodeURIComponent(key) : ''}`);
-            for (const t of page.transactions || []) {
-              const debit = t.credit_debit_indicator === 'DBIT', amount = (debit ? -1 : 1) * Number(t.transaction_amount?.amount || 0);
-              const date = t.booking_date || t.value_date || t.transaction_date; if (!date || !amount) continue;
-              const k = `${aid}|${date}|${amount.toFixed(2)}`; if ((seen.get(k) || 0) > 0) { seen.set(k, seen.get(k)! - 1); continue; }
-              const other = debit ? t.creditor : t.debtor, otherAcc = debit ? t.creditor_account : t.debtor_account;
-              const ref = t.entry_reference || t.transaction_id || hash(`${date}|${amount}|${(t.remittance_information || []).join(' ')}`);
-              rows.push({ user_id: userId, kind: 'tx', id: 'bk_' + hash(`${aid}|${ref}`), updated: Date.now(), deleted: false,
-                data: { id: 'bk_' + hash(`${aid}|${ref}`), acct: aid, date, amount, name: other?.name || '', purpose: (t.remittance_information || []).join(' '), type: t.bank_transaction_code?.description || '', iban: otherAcc?.iban || '', src: 'bank' } });
-            }
-            key = page.continuation_key || undefined;
-          } while (key && ++guard < 40);
-          if (rows.length) { const { error } = await db.from('fin_items').upsert(rows, { onConflict: 'user_id,kind,id', ignoreDuplicates: true }); if (error) throw error; added += rows.length; }
-          // Kontostand
-          try {
-            const bal = (await eb('GET', `/accounts/${acc.uid}/balances`)).balances || [];
-            const b = bal.find((x: any) => ['CLBD', 'ITBD', 'XPCD'].includes(x.balance_type)) || bal[0];
-            if (b) {
-              const { data: ex } = await db.from('fin_items').select('data').eq('user_id', userId).eq('kind', 'acct').eq('id', aid).maybeSingle();
-              const data = { ...(ex?.data || { id: aid, name: acc.name || link.institution, iban: acc.iban, bank: link.institution, kind: 'giro' }), balance: Number(b.balance_amount?.amount), balanceDate: day(new Date()) };
-              await db.from('fin_items').upsert({ user_id: userId, kind: 'acct', id: aid, data, updated: Date.now(), deleted: false }, { onConflict: 'user_id,kind,id' });
-            }
-          } catch (e) { problems.push(`${link.institution}: Kontostand nicht abrufbar`); }
-        }
-        await db.from('fin_bank_links').update({ last_sync: new Date().toISOString(), error: null }).eq('id', link.id);
-      }
-      return json(req, { ok: true, added, problems });
+      const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
+      const psu: Record<string, string> = ip ? { 'psu-ip-address': ip, 'psu-user-agent': req.headers.get('user-agent') || 'finanz-app' } : {};
+      const r = await syncLinks(db, userId, links || [], !!input.full, psu);
+      return json(req, { ok: true, ...r });
     }
     return json(req, { ok: false, error: 'unknown_action' }, 400);
   } catch (e) {

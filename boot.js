@@ -101,6 +101,13 @@ document.addEventListener('click', (e) => {
     case 'bank-start': { bankUI.busy = 'start'; render({ force: true });
       callBank('start', { bank: k }).then((r) => { if (r.ok && r.url) { location.href = r.url; return; } bankUI.busy = ''; bankUI.err = r.message || 'Verbindung konnte nicht gestartet werden.'; render({ force: true }); }); break; }
     case 'bank-sync': bankSync(); break;
+    case 'tx-to-fixed': {
+      const t = derived().txs.find((x) => x.id === id); if (!t) break;
+      const kind = t.amount > 0 ? 'income' : 'expense';
+      put('fixed', { id: uid('fx'), kind, name: t.title, amount: t.amount, day: Number(t.date.slice(8, 10)), active: true, key: kind === 'expense' ? t.mkey : undefined });
+      if (kind === 'income') { const seed = Fin.groupSeed(t); if (seed) put('rule', { id: uid('ru'), field: 'all', text: seed, sign: 'in', cat: 'einkommen' }); }
+      toast(kind === 'income' ? `„${t.title}“ zählt jetzt als regelmäßiges Einkommen` : `„${t.title}“ als Fixposten eingetragen`); go('#/plan/fix'); break;
+    }
     case 'sync-now': runSync(false); break;
     case 'signout': openSheet(`<div class="sheet-head"><h2 id="sheet-title">Abmelden</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
       <p class="sheet-text">Soll die App die Daten auf diesem Gerät behalten oder löschen? In der Cloud bleibt alles erhalten.</p>
@@ -130,6 +137,17 @@ document.addEventListener('click', (e) => {
 document.addEventListener('input', (e) => { if (e.target.id === 'q') { ui.q = e.target.value; ui.limit = 60; $('#txlist').innerHTML = txListHtml(); } });
 
 /* ---------- Bank-Anbindung (Edge Function bank-sync) ---------- */
+function askSheet(title, text, label, run) {                 // Rückfrage ohne Gefahr: Hauptknopf in Akzentfarbe
+  openSheet(`<div class="sheet-head"><h2 id="sheet-title">${esc(title)}</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
+    <p class="sheet-text">${esc(text)}</p><div class="sheet-actions"><button type="button" class="btn" data-sheet-close>Abbrechen</button><button type="button" class="btn primary" data-sheet-ok>${esc(label)}</button></div>`, $('#refresh-btn'));
+  sheet.querySelector('[data-sheet-ok]').addEventListener('click', () => { closeSheet(); run(); });
+}
+function updateRefresh() {
+  const b = $('#refresh-btn'); if (!b) return;
+  const on = bankUI.state === 'ready' && bankUI.links.some((l) => l.status === 'active');
+  b.hidden = !on; b.classList.toggle('spin', bankUI.busy === 'sync'); b.disabled = bankUI.busy === 'sync';
+}
+$('#refresh-btn').addEventListener('click', () => askSheet('Bank jetzt abrufen?', 'Die App holt neue Umsätze von deiner Bank. Das dauert einige Sekunden. Einmal am Tag passiert das auch von selbst.', 'Abrufen', bankSync));
 async function callBank(action, body = {}) {
   const { data, error } = await sb.functions.invoke('bank-sync', { body: Object.assign({ action }, body) });
   if (!error) return data;
