@@ -1,0 +1,5 @@
+VR-Bank-Beispiel-CV
+*.csv
+habits-app-references/
+.DS_Store
+node_modules/

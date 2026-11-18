@@ -1,0 +1,131 @@
+'use strict';
+// Läuft mit: node tests/core.test.js [pfad/zur/umsatz.csv]
+const fs = require('fs'), path = require('path'), assert = require('assert');
+const Fin = require('../core.js');
+let ok = 0; const t = (n, f) => { try { f(); ok++; console.log('ok  ', n); } catch (e) { console.error('FAIL', n, '\n   ', e.message); process.exitCode = 1; } };
+
+t('Betrag und Datum', () => {
+  const r = Fin.importCsv('Buchungstag;Betrag;Name Zahlungsbeteiligter;Verwendungszweck\n17.11.2026;-1.234,56;Aldi;Einkauf\n');
+  assert.equal(r.txs[0].amount, -1234.56); assert.equal(r.txs[0].date, '2026-11-17');
+});
+t('Fehlende Spalten melden einen Fehler', () => assert.ok(Fin.importCsv('a;b\n1;2').error));
+t('Doppelte Buchungen bleiben zwei, Re-Import gleiche IDs', () => {
+  const c = 'Buchungstag;Betrag;Name Zahlungsbeteiligter;Verwendungszweck\n01.11.2026;-5,00;X;Y\n01.11.2026;-5,00;X;Y\n';
+  const a = Fin.importCsv(c), b = Fin.importCsv(c);
+  assert.equal(new Set(a.txs.map((x) => x.id)).size, 2); assert.deepEqual(a.txs.map((x) => x.id), b.txs.map((x) => x.id));
+});
+const cat = (o) => Fin.categorize(Object.assign({ amount: -10, purpose: '', name: '' }, o)).cat;
+t('Regeln: Supermarkt, PayPal-Händler, Abo, Tanken', () => {
+  assert.equal(cat({ name: 'ALDI SE U. CO. KG', purpose: 'ALDI SE U. CO. KG/KLAUSENSTR. 37/BURGHAUSEN/DE' }), 'lebensmittel');
+  assert.equal(cat({ name: 'PayPal Europe S.a.r.l. et Cie S.C.A', purpose: '1054454152027/. Penny Musterstadt   , Ihr Einkauf bei Penny Musterstadt EREF: 1054454152027 MREF: 4D72 CRED: LU96 IBAN: LU89 BIC: PPLXLUL2' }), 'lebensmittel');
+  assert.equal(cat({ name: 'Hommer Fitness GmbH', purpose: 'Basic Schueler' }), 'abos');
+  assert.equal(cat({ name: 'ESSO', purpose: 'ESSO D7700 Burghausen' }), 'mobilitaet');
+  assert.equal(cat({ name: 'DZ BANK AG', purpose: 'AMAZON. 2R0AY9QE5/38 Avenue John F Kennedy/LUXEMBOURG' }), 'shopping');
+  assert.equal(cat({ name: 'X', purpose: 'Amazon Prime Mitgliedschaft' }), 'abos');
+});
+t('Unbekanntes landet in Sonstiges, positive in Sonstige Einnahmen', () => {
+  assert.equal(cat({ name: 'Irgendwer', purpose: 'Zahlung' }), 'sonstiges');
+  assert.equal(cat({ name: 'Irgendwer', purpose: 'Geschenk', amount: 30 }), 'sonstige-einnahmen');
+});
+t('Erstattung nur bei Einnahme; Umbuchung', () => {
+  assert.equal(cat({ name: 'DZ BANK', purpose: 'Gutschrift von AMAZON. NJ3R50DW4', amount: 7.99 }), 'erstattung');
+  assert.equal(cat({ name: 'PAYPAL', purpose: 'INSTANT TRANSFER EREF: 1', amount: 120 }), 'umbuchung');
+});
+t('Eigene Regel schlägt feste Regel, auch mit Betragsgrenze', () => {
+  const rules = [{ id: 'r1', field: 'purpose', text: 'von dad', cat: 'einkommen', sign: 'in' }, { id: 'r2', field: 'name', text: 'penny', cat: 'essen', max: 5 }];
+  assert.equal(Fin.categorize({ name: 'RICHTBERG MARTIN', purpose: 'Von Dad', amount: 590 }, { userRules: rules }).cat, 'einkommen');
+  assert.equal(Fin.categorize({ name: 'Penny', purpose: '', amount: -4 }, { userRules: rules }).cat, 'essen');
+  assert.equal(Fin.categorize({ name: 'Penny', purpose: '', amount: -40 }, { userRules: rules }).cat, 'lebensmittel');
+});
+t('Eigene IBAN = Umbuchung', () => assert.equal(Fin.categorize({ name: 'Ich', purpose: '', iban: 'DE00 1111', amount: -50 }, { ownIbans: ['DE001111'] }).cat, 'umbuchung'));
+
+const csv = process.argv[2] || [path.join(__dirname, '..', 'VR-Bank-Beispiel-CV')].find((p) => fs.existsSync(p));
+if (csv) {
+  const res = Fin.importCsv(fs.readFileSync(csv, 'utf8'));
+  t('Beispiel-CSV: alles gelesen', () => { assert.ok(!res.error); assert.ok(res.txs.length >= 70); assert.equal(res.skipped, 0); assert.equal(res.accounts.length, 1); });
+  const txs = res.txs.map((x) => { const r = Fin.categorize(x); return Object.assign(x, { cat: r.cat, label: Fin.displayName(x, r) }); });
+  const rec = Fin.detectRecurring(txs);
+  const byCat = {}; txs.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + 1; });
+  console.log('Kategorien:', byCat);
+  console.log('Wiederkehrend:', rec.map((r) => `${r.name} ${r.amount} (${r.count}x, Tag ${r.day})`));
+  console.log('Sonstiges:', [...new Set(txs.filter((x) => x.cat === 'sonstiges').map((x) => `${x.name} | ${Fin.cleanPurpose(x.purpose).slice(0, 40)}`))]);
+  t('Beispiel-CSV: Mehrheit erkannt (< 25 % Sonstiges)', () => assert.ok((byCat.sonstiges || 0) / txs.length < 0.25, 'zu viel Sonstiges'));
+  t('Beispiel-CSV: E.ON, Hommer/MDNS, Vodafone als wiederkehrend', () => {
+    const names = rec.map((r) => r.name.toLowerCase()).join(' ');
+    assert.ok(/e\.on|eon/.test(names)); assert.ok(/vodafone/.test(names));
+  });
+}
+
+const cats = Fin.CATEGORIES;
+t('Budget: Tageslimit sinkt nach Überziehen', () => {
+  const base = { cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: 400 }], planned: [], settings: {} };
+  const day1 = Fin.budget({ ...base, txs: [], today: '2026-11-01' });      // 600 / 30 Tage = 20
+  assert.equal(day1.day.limit, 20); assert.equal(day1.disposable, 600);
+  const txs = [{ date: '2026-11-01', amount: -80, cat: 'lebensmittel' }];   // 60 zu viel
+  const day2 = Fin.budget({ ...base, txs, today: '2026-11-02' });           // (600-80)/29
+  assert.equal(day2.day.limit, Fin.round2(520 / 29)); assert.ok(day2.day.limit < 20);
+  const sameDay = Fin.budget({ ...base, txs, today: '2026-11-01' });
+  assert.equal(sameDay.day.left, -60); assert.equal(sameDay.tomorrow, Fin.round2(520 / 29));
+});
+t('Budget: Fixkosten-Kategorien, Umbuchung und Erstattung', () => {
+  const base = { cats, fixed: [{ kind: 'income', amount: 1000 }], planned: [], settings: {} };
+  const txs = [{ date: '2026-11-03', amount: -60, cat: 'wohnen' }, { date: '2026-11-03', amount: -500, cat: 'umbuchung' }, { date: '2026-11-03', amount: -10, cat: 'essen' }, { date: '2026-11-03', amount: 4, cat: 'erstattung' }];
+  assert.equal(Fin.budget({ ...base, txs, today: '2026-11-03' }).month.spent, 6);
+});
+t('Budget: geplante Zahlung senkt das Limit, erledigte nicht', () => {
+  const base = { cats, fixed: [{ kind: 'income', amount: 900 }], settings: {}, txs: [], today: '2026-11-01' };
+  assert.equal(Fin.budget({ ...base, planned: [{ amount: -300, due: '2026-11-20' }] }).disposable, 600);
+  assert.equal(Fin.budget({ ...base, planned: [{ amount: -300, due: '2026-11-20', done: true }] }).disposable, 900);
+  assert.equal(Fin.budget({ ...base, planned: [{ amount: -300, due: '2026-12-02' }] }).disposable, 900);
+});
+t('Budget: letzter Tag im Monat und Woche am Monatsrand', () => {
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 300 }], planned: [], settings: {}, txs: [{ date: '2026-11-29', amount: -20, cat: 'essen' }], today: '2026-11-30' });
+  assert.equal(b.daysLeft, 1); assert.equal(b.tomorrow, null); assert.equal(b.day.limit, 280); assert.equal(b.week.to, '2026-11-30');
+});
+t('Beträge: Tausenderpunkt und Dezimalkomma', () => {
+  assert.equal(Fin.parseAmount('2.500'), 2500); assert.equal(Fin.parseAmount('1.234,56'), 1234.56); assert.equal(Fin.parseAmount('12.5'), 12.5); assert.equal(Fin.parseAmount('1.000.000'), 1000000); assert.equal(Fin.parseAmount('-20'), -20); assert.equal(Fin.parseAmount('12,50'), 12.5);
+});
+t('Budget: ungeplante Fixkosten mindern das Budget (Ist statt Plan)', () => {
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -60, cat: 'abos', name: 'Netflix' }], today: '2026-11-03' });
+  assert.equal(b.fixed, 60); assert.equal(b.disposable, 940); assert.equal(b.month.spent, 0);
+});
+t('Budget: Fixposten mit Händler-Schlüssel zählt nicht zusätzlich als variabel', () => {
+  const tx = { date: '2026-11-02', amount: -50, cat: 'sonstiges', name: 'Klarna Bank', purpose: '' };
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -50, key: Fin.merchantKey(tx) }], planned: [], settings: {}, txs: [tx], today: '2026-11-03' });
+  assert.equal(b.fixed, 50); assert.equal(b.month.spent, 0);
+});
+t('Geplant: überfällig zählt weiter, Treffer im Umsatz erledigt es', () => {
+  const base = { cats, fixed: [{ kind: 'income', amount: 900 }], settings: {}, txs: [], today: '2026-11-10' };
+  assert.equal(Fin.budget({ ...base, planned: [{ amount: -100, due: '2026-11-05', name: 'Klarna' }] }).planned, 100);
+  const tx = { date: '2026-11-06', amount: -100.5, name: 'Klarna Bank AB', purpose: 'Rate', cat: 'sonstiges' };
+  assert.ok(Fin.matchPlanned({ amount: -100, due: '2026-11-05', name: 'Klarna' }, [tx]));
+  assert.equal(Fin.matchPlanned({ amount: -100, due: '2026-11-05', name: 'Klarna' }, [{ ...tx, amount: -150 }]), null);
+});
+t('Budget: automatisch ignorierte Umsätze (Tagesgeld) zählen nicht', () => {
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 900 }], planned: [], settings: {}, txs: [{ date: '2026-11-03', amount: -40, cat: 'essen', autoIgnore: true }], today: '2026-11-03' });
+  assert.equal(b.month.spent, 0);
+});
+t('CSV ohne Kontospalte nutzt das gewählte Konto', () => {
+  const r = Fin.importCsv('Buchungstag;Betrag;Name\n01.11.2026;-5,00;X\n', { id: 'acc_vorhanden', name: 'Giro', useId: true });
+  assert.ok(r.noAccountColumn); assert.equal(r.txs[0].acct, 'acc_vorhanden');
+});
+t('matchPlanned: ohne Namenswort nie, ein Umsatz nur einmal, keine positiven oder ignorierten', () => {
+  const tx = { id: 'a', date: '2026-11-06', amount: -100, name: 'Klarna Bank', purpose: '', cat: 'sonstiges' }, used = new Set();
+  assert.equal(Fin.matchPlanned({ amount: -100, due: '2026-11-05', name: 'X1' }, [tx]), null);
+  assert.ok(Fin.matchPlanned({ amount: -100, due: '2026-11-05', name: 'Klarna' }, [tx], used)); assert.equal(Fin.matchPlanned({ amount: -100, due: '2026-11-06', name: 'Klarna' }, [tx], used), null);
+  assert.equal(Fin.matchPlanned({ amount: -100, due: '2026-11-05', name: 'Klarna' }, [{ ...tx, amount: 100 }]), null);
+  assert.equal(Fin.matchPlanned({ amount: -100, due: '2026-11-05', name: 'Klarna' }, [{ ...tx, autoIgnore: true }]), null);
+  assert.equal(Fin.matchPlanned({ amount: -100, due: '2026-11-30', name: 'Klarna' }, [tx]), null);
+});
+t('groupSeed: PayPal-Händler, Abrechner leer, normaler Name', () => {
+  assert.equal(Fin.groupSeed({ name: 'PayPal Europe S.a.r.l.', purpose: '1/. Penny Musterstadt , Ihr Einkauf bei Penny Musterstadt EREF: 1' }), 'Penny Musterstadt');
+  assert.equal(Fin.groupSeed({ name: 'PayPal Europe', purpose: '1/PP.6959.PP/. , Ihr Einkauf bei EREF: 1' }), '');
+  assert.equal(Fin.groupSeed({ name: 'DZ BANK AG', purpose: 'AMAZON. X' }), ''); assert.equal(Fin.groupSeed({ name: 'Rasty Pizza', purpose: '' }), 'Rasty Pizza'); assert.equal(Fin.groupSeed({ name: '', purpose: 'x' }), '');
+});
+t('Beträge: weitere Schreibweisen', () => { assert.equal(Fin.parseAmount('+5'), 5); assert.equal(Fin.parseAmount('-1.234'), -1234); assert.equal(Fin.parseAmount('1,234.56'), 1234.56); });
+t('Budget: Ist über Plan bei Fixkosten nimmt den höheren Wert', () => {
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -80, cat: 'abos', name: 'x' }], today: '2026-11-03' });
+  assert.equal(b.fixed, 80);
+});
+t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
+console.log(`\n${ok} Tests bestanden`);
