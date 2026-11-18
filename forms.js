@@ -212,7 +212,7 @@ VIEWS.einstellungen = (r) => {
   const st = settings(), d = derived();
   return `<div class="view-wrap">${pageHead('Einstellungen')}<div class="list-block">
     ${ST('#/einstellungen/konto', 'user', 'Konto & Cloud', cloud.user ? 'Angemeldet, Abgleich ' + (cloud.state === 'ok' ? 'aktuell' : cloud.state === 'error' ? 'fehlgeschlagen' : cloud.state === 'busy' ? 'läuft …' : 'bereit') : sb ? 'Nicht angemeldet, Daten nur auf diesem Gerät' : 'Cloud nicht verfügbar')}
-    ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', 'CSV importieren, Bank verbinden', '<span class="badge">Bank bald</span>')}
+    ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', 'CSV importieren, Bank verbinden', bankUI.state === 'ready' ? '' : '<span class="badge">Bank bald</span>')}
     ${ST('#/einstellungen/konten', 'wallet', 'Konten', `${live('acct').length} ${live('acct').length === 1 ? 'Konto' : 'Konten'}`)}
     ${ST('#/einstellungen/budget', 'target', 'Budget & Sparrate', `Sparrate ${eur(st.savingsTarget)} · Warnung ab ${st.warnAt} %`)}
     ${ST('#/einstellungen/kategorien', 'layers', 'Kategorien', `${d.cats.length} Kategorien, Budgets pro Kategorie`)}
@@ -241,15 +241,28 @@ async function submitLogin(form) {
   if (error) { err.textContent = 'E-Mail oder Passwort stimmt nicht.'; btn.disabled = false; btn.textContent = 'Anmelden'; $('#f-pass').focus(); return; }
   toast('Angemeldet'); render({ force: true });
 }
+const bankUI = { state: 'unknown', loaded: false, loading: false, links: [], banks: null, q: '', busy: '', err: '' };
 function setBank() {
   const accts = live('acct'), txs = live('tx');
   const lines = accts.map((a) => { const l = txs.filter((t) => t.acct === a.id); if (!l.length) return ''; const ds = l.map((t) => t.date).sort(); return `<div><dt>${esc(a.name)}</dt><dd>${l.length} Umsätze<br><span class="hint-line">${dateShort(ds[0])} bis ${dateShort(ds[ds.length - 1])}</span></dd></div>`; }).join('');
+  const st = bankUI.state, links = bankUI.links;
+  const linkRow = (l) => { const exp = l.valid_until ? Math.ceil((new Date(l.valid_until) - Date.now()) / 864e5) : null;
+    return `<div><dt>${esc(l.institution)}<br><span class="hint-line">${l.status === 'active' ? (exp != null ? (exp > 0 ? `Freigabe noch ${exp} Tage` : 'Freigabe abgelaufen') : 'Aktiv') : l.status === 'pending' ? 'Freigabe nicht abgeschlossen' : l.status === 'expired' ? 'Freigabe abgelaufen' : 'Fehler'}${l.last_sync ? ' · Abruf ' + new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(l.last_sync)) : ''}</span></dt>
+      <dd><span class="badge ${l.status === 'active' && (exp == null || exp > 7) ? 'ok' : 'warn'}">${l.status === 'active' ? (exp != null && exp <= 7 ? 'Bald erneuern' : 'Aktiv') : l.status === 'pending' ? 'Offen' : 'Erneuern'}</span></dd></div>`; };
+  let direct;
+  if (st === 'login') direct = `<p>Melde dich an, damit die App die Bank über deinen Supabase-Server verbinden kann.</p><a class="btn" href="#/einstellungen/konto">Zur Anmeldung</a>`;
+  else if (st === 'off') direct = `<p>Die Anbindung ist vorbereitet, aber auf dem Server noch nicht eingeschaltet. Bis dahin kannst du die CSV-Datei nutzen.</p><button type="button" class="btn" disabled>${icon('link')}Bank verbinden</button>`;
+  else if (st === 'ready') direct = `${links.length ? `<dl class="kv">${links.map(linkRow).join('')}</dl><button type="button" class="btn primary" data-act="bank-sync"${bankUI.busy ? ' disabled' : ''}>${icon('refresh')}${bankUI.busy === 'sync' ? 'Rufe ab …' : 'Umsätze jetzt abrufen'}</button>` : ''}
+      <div class="field"><label for="bank-q">${links.length ? 'Weitere Bank verbinden' : 'Bank suchen'}</label><div class="row"><input type="search" id="bank-q" data-fid="bank-q" value="${esc(bankUI.q)}" placeholder="zum Beispiel Volksbank" autocomplete="off"><button type="button" class="btn small" data-act="bank-search"${bankUI.busy ? ' disabled' : ''}>${bankUI.busy === 'search' ? 'Suche …' : 'Suchen'}</button></div></div>
+      ${bankUI.banks ? (bankUI.banks.length ? `<div class="list-block">${bankUI.banks.map((b) => `<button type="button" class="tx" data-act="bank-start" data-k="${esc(b.name)}"${bankUI.busy ? ' disabled' : ''}><span class="cat-ic">${icon('landmark')}</span><span class="info"><span class="name">${esc(b.name)}</span><br><span class="meta">Bei der Bank freigeben</span></span>${icon('right')}</button>`).join('')}</div>` : '<p class="hint-line">Keine Bank gefunden. Probier einen kürzeren Suchbegriff.</p>') : ''}`;
+  else direct = `<p class="hint-line">Status wird geladen …</p>`;
   return `<div class="view-wrap">${pageHead('Bank & Import', { back: '#/einstellungen' })}
-    <section class="section" style="margin-top:0"><h2>CSV importieren</h2><div class="panel"><p>Das funktioniert jetzt schon. Lade im Online-Banking den Umsatz-Export als CSV herunter (bei der Volksbank: Umsätze → Export → CSV) und wähle die Datei hier aus. Doppelte Umsätze werden erkannt und übersprungen, du kannst also jederzeit neu importieren.</p><button type="button" class="btn primary" data-act="import-csv">${icon('upload')}CSV auswählen</button></div>
-      ${lines ? `<dl class="kv" style="margin-top:var(--s3)">${lines}</dl>` : ''}</section>
-    <section class="section"><h2>Bank direkt verbinden <span class="badge">Bald</span></h2><div class="panel"><p>Die Anbindung läuft über einen sicheren Server von dir (Supabase Edge Function), damit Schlüssel nie im Browser liegen. Das Gerüst ist angelegt, es fehlen noch die Zugangsdaten eines Bank-Anbieters.</p>
-      <button type="button" class="btn" disabled>${icon('link')}Bank verbinden</button><p class="hint-line">Sobald die Zugangsdaten hinterlegt sind, schalte ich den Knopf frei. Dann holt die App neue Umsätze selbst.</p></div></section></div>`;
+    <section class="section" style="margin-top:0"><h2>Bank direkt verbinden${st === 'ready' ? '' : ' <span class="badge">Bald</span>'}</h2><div class="panel">${direct}${bankUI.err ? `<p class="error" role="alert">${esc(bankUI.err)}</p>` : ''}
+      ${st === 'ready' ? '<p class="hint-line">Die Bank fragt dich nach der Freigabe. Sie gilt nur für Kontoinformationen (lesen), nie zum Bezahlen, und läuft nach einigen Wochen ab. Dann bestätigst du sie einfach erneut.</p>' : ''}</div></section>
+    <section class="section"><h2>CSV importieren</h2><div class="panel"><p>Lade im Online-Banking den Umsatz-Export als CSV herunter (bei der Volksbank: Umsätze → Export → CSV) und wähle die Datei hier aus. Doppelte Umsätze werden erkannt und übersprungen, du kannst jederzeit neu importieren.</p><button type="button" class="btn" data-act="import-csv">${icon('upload')}CSV auswählen</button></div>
+      ${lines ? `<dl class="kv" style="margin-top:var(--s3)">${lines}</dl>` : ''}</section></div>`;
 }
+VIEW_AFTER.einstellungen = (r) => { if (r.a === 'bank' && !bankUI.loaded && !bankUI.loading) loadBank(); };
 function setKonten() {
   const accts = live('acct');
   return `<div class="view-wrap">${pageHead('Konten', { back: '#/einstellungen', actions: `<a class="icon-btn add" href="#/neu/konto" aria-label="Konto anlegen">${icon('plus')}</a>` })}

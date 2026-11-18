@@ -96,6 +96,11 @@ document.addEventListener('click', (e) => {
     case 'export-csv': exportCsv(); break;
     case 'export-json': exportJson(); break;
     case 'import-json': $('#json-file').click(); break;
+    case 'bank-search': { bankUI.q = ($('#bank-q') || {}).value || ''; bankUI.busy = 'search'; bankUI.err = ''; render({ force: true });
+      callBank('banks', { query: bankUI.q }).then((r) => { bankUI.busy = ''; if (r.ok) bankUI.banks = r.banks; else bankUI.err = r.message || 'Suche fehlgeschlagen.'; render({ force: true }); }); break; }
+    case 'bank-start': { bankUI.busy = 'start'; render({ force: true });
+      callBank('start', { bank: k }).then((r) => { if (r.ok && r.url) { location.href = r.url; return; } bankUI.busy = ''; bankUI.err = r.message || 'Verbindung konnte nicht gestartet werden.'; render({ force: true }); }); break; }
+    case 'bank-sync': bankSync(); break;
     case 'sync-now': runSync(false); break;
     case 'signout': openSheet(`<div class="sheet-head"><h2 id="sheet-title">Abmelden</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
       <p class="sheet-text">Soll die App die Daten auf diesem Gerät behalten oder löschen? In der Cloud bleibt alles erhalten.</p>
@@ -123,6 +128,39 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('input', (e) => { if (e.target.id === 'q') { ui.q = e.target.value; ui.limit = 60; $('#txlist').innerHTML = txListHtml(); } });
+
+/* ---------- Bank-Anbindung (Edge Function bank-sync) ---------- */
+async function callBank(action, body = {}) {
+  const { data, error } = await sb.functions.invoke('bank-sync', { body: Object.assign({ action }, body) });
+  if (!error) return data;
+  let d = {}, status = 0; try { status = error.context.status; d = await error.context.json(); } catch (e) { /* kein JSON */ }
+  return Object.assign({ ok: false, error: status === 404 ? 'not_deployed' : 'failed', message: error.message }, d);
+}
+async function loadBank() {
+  if (!sb || !cloud.user) { bankUI.state = 'login'; bankUI.loaded = true; render(); return; }
+  bankUI.loading = true;
+  const r = await callBank('status');
+  bankUI.loading = false; bankUI.loaded = true;
+  if (r.ok) { bankUI.state = 'ready'; bankUI.links = r.links || []; bankUI.err = ''; }
+  else if (r.error === 'not_configured' || r.error === 'not_deployed') bankUI.state = 'off';
+  else { bankUI.state = 'ready'; bankUI.err = r.message || 'Status konnte nicht geladen werden.'; }
+  render();
+}
+async function bankSync() {
+  bankUI.busy = 'sync'; bankUI.err = ''; render();
+  const r = await callBank('sync');
+  bankUI.busy = '';
+  if (!r.ok) { bankUI.err = r.message || 'Abruf fehlgeschlagen.'; toast(bankUI.err, 'error'); }
+  else { toast(`${r.added} neue ${r.added === 1 ? 'Umsatz' : 'Umsätze'} von der Bank${r.problems && r.problems.length ? '. Hinweis: ' + r.problems[0] : ''}`, r.problems && r.problems.length ? 'error' : undefined); await runSync(true); }
+  const st = await callBank('status'); if (st.ok) bankUI.links = st.links || [];
+  render({ force: true });
+}
+if (/[?&]bank=(ok|fehler)/.test(location.hash)) {        // Rücksprung von der Bank
+  const ok = /bank=ok/.test(location.hash), msg = decodeURIComponent((location.hash.match(/msg=([^&]*)/) || [])[1] || '');
+  history.replaceState(null, '', location.pathname + location.search + '#/einstellungen/bank');
+  if (ok) { toast('Bank verbunden. Hole Umsätze …'); setTimeout(() => { bankUI.loaded = false; bankSync(); }, 800); }
+  else toast(`Verbindung nicht hergestellt${msg ? ': ' + msg : ''}`, 'error');
+}
 
 /* ---------- Updates (wie bei Habits: Version vergleichen, dann frisch laden) ---------- */
 async function checkForUpdate() {
