@@ -118,8 +118,8 @@ function derived() {
   }
   out.sort((a, b) => (b.date.localeCompare(a.date)) || (a.id < b.id ? 1 : -1));
   // Vorschläge: erkannte Wiederkehrer, die noch nicht als Fixposten eingetragen sind
-  const fixMatcher = Fin.fixedMatcher(live('fixed'));
-  for (const t of out) { const fid = fixMatcher(t); if (fid) t.fixedId = fid; }
+  const fixMatcher = Fin.fixedMatcher(live('fixed')), incMatcher = Fin.incomeMatcher(live('fixed'));
+  for (const t of out) { const fid = fixMatcher(t); if (fid) t.fixedId = fid; const it = incMatcher(t); if (it) t.incomeDate = Fin.incomeDateFor(t.date, it.day); }
   const rec = [], suggestions = [];                  // Wiederkehrendes wird nicht mehr automatisch erkannt: Fixkosten trägst du selbst ein
   const used = new Set(), byDue = live('planned').sort((a, b) => a.due.localeCompare(b.due));
   const planned = byDue.map((p) => Object.assign({}, p, { matched: !p.done && !!Fin.matchPlanned(p, out, used) }));

@@ -394,7 +394,7 @@
     return months.map((mk) => {
       let inc = 0, exp = 0;
       for (const t of txs) {
-        if (t.ignore || t.autoIgnore || !t.date.startsWith(mk)) continue;
+        if (t.ignore || t.autoIgnore || !effDate(t).startsWith(mk)) continue;
         const c = cmap.get(t.cat) || { kind: t.amount < 0 ? 'expense' : 'income' };
         if (c.kind === 'transfer') continue;
         if (c.kind === 'refund') exp -= t.amount; else if (t.amount > 0) inc += t.amount; else exp -= t.amount;
@@ -430,11 +430,30 @@
     const b = Fin.budget({ ...ctx, today: per.to, planned: plannedFor(per) });
     return { range, off, from: per.from, to: per.to, limit: b.month.budget, spent: b.month.spent, left: b.month.left, b, current: false };
   };
+  // Regelmäßiges Einkommen gehört immer genau einem Monat: dem, dessen üblicher Tag dem Eingang am nächsten liegt
+  // (Tag 1: der 30.10. zählt zum November, der 1.10. zum Oktober). Liefert das Datum, unter dem die Einnahme in Berichten zählt.
+  Fin.incomeMatcher = (items) => {
+    const list = items.filter((f) => !f.deleted && f.active !== false && f.kind === 'income' && String(f.match || '').trim()).map((f) => ({ day: f.day, text: fold(f.match).trim() }));
+    return (tx) => { if (!(tx.amount > 0) || !list.length) return null; const h = tx.hay || Fin.haystack(tx); return list.find((m) => h.includes(m.text)) || null; };
+  };
+  Fin.incomeDateFor = (date, day) => {
+    const d = dparse(date); let best = date, bestDist = Infinity;
+    for (let k = -1; k <= 1; k++) {
+      const y = new Date(d.getFullYear(), d.getMonth() + k, 1), cand = dkey(new Date(y.getFullYear(), y.getMonth(), Math.min(Math.max(1, Math.round(day) || 1), daysInMonth(y.getFullYear(), y.getMonth()))));
+      const dist = Math.abs((dparse(cand) - d) / 864e5);
+      if (dist < bestDist) { bestDist = dist; best = cand; }
+    }
+    return best;
+  };
+  // Datum, unter dem eine Buchung in Monatssummen zählt (Einnahmen aus einem Einkommensposten: nächstliegender Monat)
+  const effDate = (t) => (t.amount > 0 && t.incomeDate ? t.incomeDate : t.date);
+  Fin.effDate = effDate;
   // Summen für einen beliebigen Zeitraum (ohne Umbuchungen; Erstattungen mindern die Ausgaben)
   Fin.rangeTotals = (txs, cats, from, to) => {
     const cmap = Fin.catMap(cats); let inc = 0, exp = 0;
     for (const t of txs) {
-      if (t.date < from || t.date > to || t.ignore || t.autoIgnore) continue;
+      const ed = effDate(t);
+      if (ed < from || ed > to || t.ignore || t.autoIgnore) continue;
       const c = cmap.get(t.cat) || { kind: t.amount < 0 ? 'expense' : 'income' };
       if (c.kind === 'transfer') continue;
       if (c.kind === 'refund') exp -= t.amount; else if (t.amount > 0) inc += t.amount; else exp -= t.amount;

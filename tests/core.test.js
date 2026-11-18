@@ -216,5 +216,15 @@ t('Vergangene Tage, Wochen und Budgetmonate sind abrufbar', () => {
   assert.equal(m.from, '2026-10-01'); assert.equal(m.to, '2026-10-31'); assert.equal(m.spent, 30); assert.equal(m.left, 570);
   const now = Fin.rangeView(ctx, 'monat', 0); assert.equal(now.current, true); assert.equal(now.spent, 80);
 });
+t('Einkommen zählt immer genau einem Monat: dem nächstliegenden (Tag 1: 30.10. zählt zum November)', () => {
+  assert.equal(Fin.incomeDateFor('2026-10-30', 1), '2026-11-01'); assert.equal(Fin.incomeDateFor('2026-10-01', 1), '2026-10-01');
+  assert.equal(Fin.incomeDateFor('2026-11-02', 1), '2026-11-01'); assert.equal(Fin.incomeDateFor('2026-12-29', 1), '2027-01-01');
+  assert.equal(Fin.incomeDateFor('2026-11-14', 30), '2026-10-30');         // 14.11. liegt näher am 30.10. (15 Tage) als am 30.11. (16 Tage)
+  const dad = (d) => ({ date: d, amount: 590, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'einkommen' }), m = Fin.incomeMatcher([{ kind: 'income', day: 1, match: 'richtberg martin', active: true }]);
+  const txs = [dad('2026-10-01'), dad('2026-10-30'), { date: '2026-10-19', amount: 280, name: 'Ich', purpose: '', cat: 'sonstige-einnahmen' }].map((t) => { const it = m(t); return it ? { ...t, incomeDate: Fin.incomeDateFor(t.date, it.day) } : t; });
+  const mo = Fin.monthly(txs, cats, ['2026-10', '2026-11']);
+  assert.equal(mo[0].income, 590 + 280); assert.equal(mo[1].income, 590);
+  assert.equal(Fin.rangeTotals(txs, cats, '2026-11-01', '2026-11-30').income, 590);
+});
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);

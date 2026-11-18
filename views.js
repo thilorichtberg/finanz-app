@@ -196,6 +196,7 @@ function umBerichte() {
   const diff = cur.expense - pr.expense;
   return `<div class="view-wrap">${pageHead(T_UM())}${UM_SEG('berichte')}${monthNav(mk)}
     <div class="sum3"><div class="stat"><div class="l">Einnahmen</div><div class="v amt in">${eur(cur.income)}</div></div><div class="stat"><div class="l">Ausgaben</div><div class="v amt">${eur(cur.expense)}</div></div><div class="stat"><div class="l">Saldo</div><div class="v amt ${cur.net < 0 ? 'over' : 'in'}">${signed(cur.net)}</div></div></div>
+    <p class="hint-line" style="margin-bottom:var(--s3)">Regelmäßiges Einkommen zählt immer dem Monat, dessen üblicher Tag dem Eingang am nächsten liegt.</p>
     <p class="hint-line" style="margin-bottom:var(--s3)">${pr.expense || pr.income ? `Gegenüber ${esc(MONTHS[Number(prev.slice(5)) - 1])}: Ausgaben ${diff === 0 ? 'unverändert' : (diff > 0 ? eur(diff) + ' mehr' : eur(-diff) + ' weniger')}.` : 'Kein Vormonat zum Vergleichen.'}</p>
     <div class="chart" role="img" aria-label="Einnahmen und Ausgaben der letzten 6 Monate. ${rows.map((x) => `${MONTHS[Number(x.month.slice(5)) - 1]}: Einnahmen ${eur(x.income)}, Ausgaben ${eur(x.expense)}`).join('. ')}">
       <svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><line class="gridline" x1="0" x2="${W}" y1="112" y2="112"/>${bars}</svg>
