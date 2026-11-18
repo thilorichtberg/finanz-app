@@ -313,6 +313,13 @@ async function checkForUpdate() {
 
 /* ---------- Start ---------- */
 ensureCatColors();
+if (!settings().colorsV2) {                                  // einmalig: „Sonstiges“ wird lila (Platz 7), die Kategorie, die den Platz hatte, bekommt den bisherigen von „Sonstiges“
+  const map = Object.assign({}, settings().catColors || {});
+  if (map.sonstiges != null) {
+    const holder = Object.keys(map).find((k) => k !== 'sonstiges' && map[k] === 6); if (holder) map[holder] = map.sonstiges;
+    map.sonstiges = 6; setSettings({ catColors: map, colorsV2: true });
+  }
+}
 if (!settings().periodV2) {                                  // einmalig: Budgetmonate sind wieder ganze Kalendermonate (1. bis Monatsende)
   setSettings({ periodStart: 1, periodV2: true });
 }
