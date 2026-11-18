@@ -191,5 +191,21 @@ t('Gehalt-Abweichung: ok, abweichend, ausstehend, überfällig, Teilzahlungen we
   assert.equal(run(alt, '2026-11-02').status, 'pending'); assert.equal(run(alt, '2026-11-18').status, 'late'); assert.equal(run([], '2026-11-18').status, 'unknown');
   assert.equal(Fin.incomeCheck({ txs: [], fixed: [{ kind: 'income', amount: 100, day: 1 }], settings: {}, today: '2026-11-18' })[0].status, 'unknown');
 });
+t('Im Minus: Tageslimit wird negativ statt bei 0 zu stoppen', () => {
+  const base = { cats, fixed: [{ kind: 'income', amount: 300 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -400, cat: 'essen' }] };
+  const b = Fin.budget({ ...base, today: '2026-11-03' });                    // 300 - 400 = -100 über 28 Tage
+  assert.equal(b.day.limit, Fin.round2(-100 / 28)); assert.ok(b.day.left < 0); assert.ok(b.tomorrow < 0);
+});
+t('Vergangene Tage, Wochen und Budgetmonate sind abrufbar', () => {
+  const txs = [{ date: '2026-10-20', amount: -30, cat: 'essen' }, { date: '2026-11-05', amount: -50, cat: 'essen' }, { date: '2026-11-06', amount: -20, cat: 'essen' }, { date: '2026-11-12', amount: -10, cat: 'essen' }];
+  const ctx = { txs, cats, fixed: [{ kind: 'income', amount: 600 }], planned: [], settings: {}, today: '2026-11-12' };
+  const d1 = Fin.rangeView(ctx, 'tag', -6);                                     // 6. November: 20 € ausgegeben, Limit nach dem 5. (50 € weg): (600-50)/25
+  assert.equal(d1.from, '2026-11-06'); assert.equal(d1.spent, 20); assert.equal(d1.limit, Fin.round2((600 - 50) / 25));
+  const w = Fin.rangeView(ctx, 'woche', -1);                                    // Woche 2.-8. November
+  assert.equal(w.from, '2026-11-02'); assert.equal(w.to, '2026-11-08'); assert.equal(w.spent, 70); assert.equal(w.limit, Fin.round2(Fin.round2(600 / 29) * 7));   // Tageslimit am 2. November mal 7 Tage
+  const m = Fin.rangeView(ctx, 'monat', -1);                                    // Oktober
+  assert.equal(m.from, '2026-10-01'); assert.equal(m.to, '2026-10-31'); assert.equal(m.spent, 30); assert.equal(m.left, 570);
+  const now = Fin.rangeView(ctx, 'monat', 0); assert.equal(now.current, true); assert.equal(now.spent, 80);
+});
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);

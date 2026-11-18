@@ -485,6 +485,9 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 .pie-center .pc-sub { color: var(--muted); font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .sw { width: 12px; height: 12px; border-radius: 4px; flex: none; display: inline-block; }
 
+.bnav { gap: var(--s1); }
+.bnav .m { font-size: 1rem; min-width: 0; overflow-wrap: anywhere; }
+.bnav .btn.small { flex: none; min-width: 64px; }
 /* Punkt am Einstellungen-Symbol, wenn Warnungen vorliegen; Beispiel-Buchung im Formular */
 .tabbar .ico { position: relative; }
 .tabbar .dot { position: absolute; top: -3px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bg); }

@@ -359,7 +359,7 @@
     const disposable = round2(income - fixedSum - plannedSum - savings);
     const spendOn = (a, b) => round2(txs.reduce((s, t) => (t.date >= a && t.date <= b ? s + Fin.variableSpend(t, cmap, matcher) : s), 0));
     const spentMonth = spendOn(ms, today), spentToday = spendOn(today, today), spentBeforeToday = round2(spentMonth - spentToday);
-    const limitToday = Math.max(0, round2((disposable - spentBeforeToday) / daysLeft));
+    const limitToday = round2((disposable - spentBeforeToday) / daysLeft);        // kann negativ sein: dann bist du schon im Minus und siehst es auch so
     const wStart = Fin.weekStart(today), wEnd = Fin.addDays(wStart, 6);
     const wFrom = wStart < ms ? ms : wStart, wTo = wEnd > me ? me : wEnd;
     const spentWeek = spendOn(wFrom, today), spentWeekBefore = round2(spentWeek - spentToday);
@@ -372,7 +372,7 @@
       week: { budget: weekBudget, spent: spentWeek, left: round2(weekBudget - spentWeek), from: wFrom, to: wTo },
       day: { limit: limitToday, spent: spentToday, left: round2(limitToday - spentToday) },
       // Limit für morgen, wenn heute so bleibt (zeigt, wie stark Überziehen die Resttage kostet)
-      tomorrow: daysLeft > 1 ? Math.max(0, round2((disposable - spentMonth) / (daysLeft - 1))) : null,
+      tomorrow: daysLeft > 1 ? round2((disposable - spentMonth) / (daysLeft - 1)) : null,
       forecast: round2(pace * dim),
     };
   };
@@ -401,6 +401,34 @@
       }
       return { month: mk, income: round2(inc), expense: round2(exp), net: round2(inc - exp) };
     });
+  };
+  // Variable Ausgaben in einem Zeitraum (ohne Fixkosten-Buchungen, Umbuchungen, ignorierte)
+  Fin.spentIn = ({ txs, cats, fixed = [] }, from, to) => {
+    const cmap = Fin.catMap(cats), m = Fin.fixedMatcher(fixed.filter((f) => !f.deleted && f.active !== false && f.kind !== 'income'));
+    return round2(txs.reduce((s, t) => (t.date >= from && t.date <= to ? s + Fin.variableSpend(t, cmap, m) : s), 0));
+  };
+  // Ansicht für Tag, Woche oder Budgetmonat, auch vergangene (off = 0 jetzt, -1 davor, …). Zahlen wie im Budget, Minus wird mitgezeigt.
+  // Vergangener Tag: Limit und Ausgaben des Tages. Vergangene Woche: Tageslimit am Wochenanfang mal Tage gegen die Ausgaben der Woche. Vergangener Monat: Budget des Zeitraums gegen alle Ausgaben darin.
+  Fin.rangeView = (ctx, range, off = 0) => {
+    const { today, settings = {}, planned = [] } = ctx, sd = settings.periodStart || 1;
+    const plannedFor = (per) => planned.filter((p) => p.due >= per.from && p.due <= per.to);
+    const cur = Fin.budget(ctx);
+    if (range === 'tag') {
+      const ref = Fin.addDays(today, off);
+      const b = off === 0 ? cur : Fin.budget({ ...ctx, today: ref, planned: plannedFor(Fin.period(ref, sd)) });
+      return { range, off, from: ref, to: ref, limit: b.day.limit, spent: b.day.spent, left: b.day.left, daysLeft: b.daysLeft, tomorrow: b.tomorrow, b, current: off === 0 };
+    }
+    if (range === 'woche') {
+      if (off === 0) return { range, off, from: cur.week.from, to: cur.week.to, limit: cur.week.budget, spent: cur.week.spent, left: cur.week.left, b: cur, current: true, daysLeftWeek: cur.daysLeftWeek };
+      const mon = Fin.addDays(Fin.weekStart(today), 7 * off), sun = Fin.addDays(mon, 6), per = Fin.period(sun, sd);
+      const from = mon < per.from ? per.from : mon, to = sun > per.to ? per.to : sun, days = Math.round((Fin.dparse(to) - Fin.dparse(from)) / 864e5) + 1;
+      const b0 = Fin.budget({ ...ctx, today: from, planned: plannedFor(per) }), budget = round2(b0.day.limit * days), spent = Fin.spentIn(ctx, from, to);
+      return { range, off, from, to, limit: budget, spent, left: round2(budget - spent), b: b0, current: false };
+    }
+    let per = Fin.period(today, sd); for (let i = 0; i < -off; i++) per = Fin.period(Fin.addDays(per.from, -1), sd);
+    if (off === 0) return { range, off, from: cur.from, to: cur.to, limit: cur.month.budget, spent: cur.month.spent, left: cur.month.left, b: cur, current: true };
+    const b = Fin.budget({ ...ctx, today: per.to, planned: plannedFor(per) });
+    return { range, off, from: per.from, to: per.to, limit: b.month.budget, spent: b.month.spent, left: b.month.left, b, current: false };
   };
   // Summen für einen beliebigen Zeitraum (ohne Umbuchungen; Erstattungen mindern die Ausgaben)
   Fin.rangeTotals = (txs, cats, from, to) => {

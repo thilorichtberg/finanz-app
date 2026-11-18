@@ -21,6 +21,8 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 
 Übergangsweise gibt es oben in der Mitte einen Schalter **Alt | Neu**. „Neu“ hat andere Symbole unten und diese Reihenfolge: **Budget** (Zeitraum-Schalter, „Heute übrig“, alle Ein- und Ausgaben des Zeitraums), **Übersicht** (Liste, Kategorien mit Tortendiagramm, Berichte), **Neu**, **Plan** (Fixkosten zuerst) und **Einstellungen**. Fixkosten und Einkommen trägst du selbst ein (fester Monatsbetrag, optional mit Beispiel-Buchung zur Erkennung), es gibt keine automatische Erkennung wiederkehrender Zahlungen mehr, nur die Kategorien-Erkennung. Einstellungen → **Warnungen** sammelt Hinweise (Fixkosten dauerhaft über dem Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets, ablaufende Bank-Freigabe); ein roter Punkt am Einstellungen-Symbol zeigt, dass etwas wartet.
 
+Auf der Budget-Seite kannst du mit den Pfeilen durch vergangene Tage, Wochen und Budgetmonate blättern; der Knopf daneben springt mit einem Klick zurück auf jetzt. Ist das Budget aufgebraucht, zeigen Tag und Woche das Minus (nicht 0 €).
+
 ## So rechnet das Budget
 
 ```

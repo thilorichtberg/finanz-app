@@ -106,6 +106,8 @@ document.addEventListener('click', (e) => {
       callBank('banks', { query: bankUI.q }).then((r) => { bankUI.busy = ''; if (r.ok) bankUI.banks = r.banks; else bankUI.err = r.message || 'Suche fehlgeschlagen.'; render({ force: true }); }); break; }
     case 'bank-start': { bankUI.busy = 'start'; render({ force: true });
       callBank('start', { bank: k }).then((r) => { if (r.ok && r.url) { location.href = r.url; return; } bankUI.busy = ''; bankUI.err = r.message || 'Verbindung konnte nicht gestartet werden.'; render({ force: true }); }); break; }
+    case 'bnav': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; ui.bo[rg] = Math.min(0, ui.bo[rg] + Number(k)); render({ force: true }); break; }
+    case 'bnow': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; ui.bo[rg] = 0; render({ force: true }); break; }
     case 'rb': ui.rb = Math.max(1, ui.rb + Number(k)); render({ force: true }); announce(`${dateShort(Fin.review({ txs: derived().txs, cats: derived().cats, fixed: live('fixed'), settings: settings(), today: todayKey() }, ui.rb).from)}`); break;
     case 'fix-adjust': {
       const f = get('fixed', id); if (!f) break;
