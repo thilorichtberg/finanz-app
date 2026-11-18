@@ -146,5 +146,19 @@ t('Unterhalt um den 30./1. wird als wiederkehrend erkannt (auch bei zwei Zahlung
   const rec = Fin.detectRecurring([mk('2026-09-01'), mk('2026-10-01'), mk('2026-10-30')]);
   assert.equal(rec.length, 1); assert.equal(rec[0].kind, 'income'); assert.equal(rec[0].amount, 590);
 });
+t('Fixposten mit Schlüssel: Ist ersetzt Plan nur beim selben Händler, nicht abgebuchte zählen mit Plan', () => {
+  const ms = { name: 'MDNS Sportstudio GmbH', purpose: '', date: '2026-11-02', amount: -29.9, cat: 'abos' };
+  const key = Fin.merchantKey(ms);
+  const fixed = [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -69, key: Fin.merchantKey({ name: 'Alter Verein', purpose: '' }) }, { kind: 'expense', amount: -30, key }];
+  const b = Fin.budget({ cats, fixed, planned: [], settings: {}, txs: [{ ...ms, mkey: key }], today: '2026-11-03' });
+  assert.equal(b.fixed, 69 + 30);         // veralteter Posten (nie abgebucht) zählt weiter, der andere hat 29,90 gebucht, Plan 30 gilt
+  const b2 = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -20, key }], planned: [], settings: {}, txs: [{ ...ms, amount: -86, mkey: key }], today: '2026-11-03' });
+  assert.equal(b2.fixed, 86);             // zwei Monate auf einmal gebucht: der Ist-Betrag zählt
+});
+t('Wiederkehrend: Doppelbuchung (zwei Monate auf einmal) bricht die Erkennung nicht, Name statt Regelbezeichnung', () => {
+  const mk = (d, a) => ({ id: d, date: d, amount: a, name: 'Hommer Fitness GmbH', purpose: 'Basic', cat: 'abos', label: 'Fitnessstudio' });
+  const rec = Fin.detectRecurring([mk('2026-09-01', -29.9), mk('2026-10-01', -59.8), mk('2026-11-02', -29.9)]);
+  assert.equal(rec.length, 1); assert.equal(rec[0].amount, -29.9); assert.equal(rec[0].name, 'Hommer Fitness GmbH');
+});
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);

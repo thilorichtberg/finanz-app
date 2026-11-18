@@ -200,14 +200,15 @@
       if (same.length < minN) continue;
       const amts = same.map((i) => Math.abs(i.amount)).sort((a, b) => a - b);
       const med = amts[Math.floor(amts.length / 2)];
-      const near = same.filter((i) => Math.abs(Math.abs(i.amount) - med) <= Math.max(2, med * 0.2));
+      const near = same.filter((i) => { const a = Math.abs(i.amount), k = Math.round(a / med); return Math.abs(a - med) <= Math.max(2, med * 0.2) || (k >= 2 && k <= 4 && Math.abs(a - k * med) <= Math.max(2, k * med * 0.05)); });   // auch Doppelbuchungen (zwei Monate auf einmal)
       if (near.length < minN) continue;
       const gaps = [];
       for (let i = 1; i < near.length; i++) gaps.push((dparse(near[i].date) - dparse(near[i - 1].date)) / 864e5);
       const monthly = gaps.filter((d) => d >= 24 && d <= 37).length;
       if (monthly < Math.max(minN - 1, Math.ceil(gaps.length * 0.6))) continue;
       const last = near[near.length - 1];
-      out.push({ key: g.key, name: last.label || Fin.displayName(last, null), amount: round2(med * sign), day: dparse(last.date).getDate(), cat: last.cat, count: near.length, last: last.date, kind: sign >= 0 ? 'income' : 'expense' });
+      const cp = /paypal/i.test(last.name || '') ? Fin.paypalMerchant(last.purpose) : (last.name || '').trim();      // echter Name statt allgemeiner Regelbezeichnung („Fitnessstudio" kann mehrere Studios meinen)
+      out.push({ key: g.key, name: cp || last.label || Fin.displayName(last, null), amount: round2(med * sign), day: dparse(last.date).getDate(), cat: last.cat, count: near.length, last: last.date, kind: sign >= 0 ? 'income' : 'expense' });
     }
     return out.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
   };
@@ -347,9 +348,18 @@
     const fixKeys = new Set(active.filter((f) => f.kind !== 'income' && f.key).map((f) => f.key));
     const income = round2(active.filter((f) => f.kind === 'income').reduce((s, f) => s + Math.abs(f.amount), 0));
     const fixedPlan = round2(active.filter((f) => f.kind !== 'income').reduce((s, f) => s + Math.abs(f.amount), 0));
-    // Ist-Fixkosten dieses Monats: ungeplante Abos oder Rechnungen sollen das Budget trotzdem mindern
-    const fixedActual = round2(txs.reduce((s, t) => (t.date >= ms && t.date <= me && !t.ignore && !t.autoIgnore && Fin.isFixedTx(t, cmap, fixKeys) ? s - t.amount : s), 0));
-    const fixedSum = Math.max(fixedPlan, fixedActual);
+    // Fixkosten je Posten: gebucht im Zeitraum (über den Händler-Schlüssel gefunden), mindestens der Plan-Betrag. Ein Posten, der noch nicht abgebucht wurde, zählt mit seinem Plan-Betrag.
+    // Posten ohne Schlüssel und Fixkosten-Buchungen ohne Posten (zum Beispiel ungeplante Abos) werden gemeinsam verglichen: der höhere Wert gilt.
+    const inP = txs.filter((t) => t.date >= ms && t.date <= me && !t.ignore && !t.autoIgnore && t.amount < 0);
+    let keyedSum = 0, planLoose = 0; const taken = new Set();
+    for (const f of active.filter((x) => x.kind !== 'income')) {
+      if (!f.key) { planLoose += Math.abs(f.amount); continue; }
+      let act = 0; for (const t of inP) if ((t.mkey || Fin.merchantKey(t)) === f.key) act -= t.amount;
+      keyedSum += Math.max(Math.abs(f.amount), act);
+    }
+    let looseActual = 0; for (const t of inP) if (Fin.isFixedTx(t, cmap, fixKeys) && !fixKeys.has(t.mkey || Fin.merchantKey(t))) looseActual -= t.amount;
+    const fixedActual = round2(keyedSum + looseActual);
+    const fixedSum = round2(keyedSum + Math.max(planLoose, looseActual));
     // Offene geplante Zahlungen: fällig bis Monatsende, auch überfällige (so lange nicht abgehakt oder im Umsatz gefunden)
     const plannedOpen = planned.filter((p) => !p.deleted && !p.done && p.due <= me && !(p.matched));
     const plannedSum = round2(plannedOpen.reduce((s, p) => s + Math.abs(p.amount), 0));

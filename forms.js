@@ -185,7 +185,18 @@ function planGeplant() {
 function planFix() {
   const items = live('fixed'), inc = items.filter((x) => x.kind === 'income').sort((a, b) => a.day - b.day), exp = items.filter((x) => x.kind !== 'income').sort((a, b) => a.day - b.day);
   const sum = (l) => l.filter((x) => x.active !== false).reduce((s, x) => s + Math.abs(x.amount), 0), d = derived();
-  const row = (x) => `<a class="tx ${x.active === false ? 'muted-row' : ''}" href="#/neu/fix/${encodeURIComponent(x.id)}"><span class="cat-ic">${icon(x.kind === 'income' ? 'trend' : 'repeat')}</span><span class="info"><span class="name">${esc(x.name)}</span><br><span class="meta">Am ${x.day}. jeden Monat${x.active === false ? ' · pausiert' : ''}</span></span>${amt(x.amount)}</a>`;
+  const b = budget();
+  // Was ist mit dem Posten in diesem Budgetmonat passiert? Zeigt veraltete Posten (nicht mehr abgebucht) und Sammelbuchungen (mehrere Monate auf einmal)
+  const state = (x) => {
+    if (x.kind === 'income' || !x.key || x.active === false) return { text: '', cls: '' };
+    const mine = d.txs.filter((t) => t.mkey === x.key && t.amount < 0 && !t.ignore), now = mine.filter((t) => t.date >= b.from && t.date <= b.to);
+    const paid = now.reduce((s, t) => s - t.amount, 0), plan = Math.abs(x.amount);
+    if (paid > 0) return { text: paid >= plan * 1.8 ? `Gebucht ${eur(paid)}, das sind etwa ${Math.round(paid / plan)} Monate auf einmal` : `Gebucht ${eur(paid)}`, cls: paid >= plan * 1.8 ? 'warn-text' : '' };
+    if (!mine.length) return { text: 'Noch nie in deinen Umsätzen gefunden. Noch aktuell?', cls: 'warn-text' };
+    const gap = Math.round((Date.now() - Fin.dparse(mine[0].date)) / 864e5);
+    return gap > 45 ? { text: `Zuletzt am ${dateShort(mine[0].date)} abgebucht. Noch aktuell?`, cls: 'warn-text' } : { text: 'Noch nicht abgebucht', cls: '' };
+  };
+  const row = (x) => { const st = state(x); return `<a class="tx ${x.active === false ? 'muted-row' : ''}" href="#/neu/fix/${encodeURIComponent(x.id)}"><span class="cat-ic">${icon(x.kind === 'income' ? 'trend' : 'repeat')}</span><span class="info"><span class="name">${esc(x.name)}</span><br><span class="meta">Am ${x.day}. jeden Monat${x.active === false ? ' · pausiert' : ''}</span>${st.text ? `<br><span class="meta ${st.cls}">${esc(st.text)}</span>` : ''}</span>${amt(x.amount)}</a>`; };
   const sug = d.suggestions.slice(0, 6).map((s) => `<div class="notice" style="margin-top:var(--s2)"><p><strong>${esc(s.name)}</strong> · ${eur(s.amount)} · um den ${s.day}. · ${s.count}× gesehen</p><div class="btn-row" style="display:flex;gap:var(--s2)"><button type="button" class="btn small" data-act="adopt" data-k="${esc(s.key)}">Übernehmen</button><button type="button" class="btn small ghost" data-act="dismiss" data-k="${esc(s.key)}">Ausblenden</button></div></div>`).join('');
   return `<div class="view-wrap">${pageHead('Plan', { actions: `<a class="icon-btn add" href="#/neu/fix" aria-label="Fixposten anlegen">${icon('plus')}</a>` })}${PL_SEG('fix')}
     <dl class="kv"><div><dt>Einnahmen pro Monat</dt><dd>${eur(sum(inc))}</dd></div><div><dt>Fixkosten pro Monat</dt><dd>${eur(sum(exp))}</dd></div><div class="total"><dt class="k">Bleibt übrig</dt><dd>${eur(sum(inc) - sum(exp))}</dd></div></dl>
