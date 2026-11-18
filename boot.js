@@ -256,6 +256,9 @@ async function checkForUpdate() {
 }
 
 /* ---------- Start ---------- */
+if (!settings().periodV2) {                                  // einmalig: Budgetmonate sind wieder ganze Kalendermonate (1. bis Monatsende)
+  setSettings({ periodStart: 1, periodV2: true });
+}
 if (!settings().resetV1) {                                   // einmalig: automatisch erkannte Fixposten und Einkommen zurücksetzen, du trägst sie selbst ein
   live('fixed').forEach((f) => remove('fixed', f.id));
   setSettings({ resetV1: true });

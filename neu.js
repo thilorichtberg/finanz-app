@@ -22,31 +22,31 @@ VIEWS_NEU.heute = (r) => {
   const d = derived(), st = settings(), t = todayKey(), off = ui.bo[range];
   const V = Fin.rangeView({ txs: d.txs, cats: d.cats, fixed: live('fixed'), planned: d.planned, settings: st, today: t }, range, off);
   const hasPlan = V.b.income > 0, left = V.left, spent = V.spent, budgetV = V.limit, p = pct(spent, budgetV), past = !V.current;
-  const CAP = { tag: ['Heute übrig', 'Übrig an diesem Tag'], woche: ['Diese Woche übrig', 'Übrig in dieser Woche'], monat: ['Budgetmonat übrig', 'Übrig im Budgetmonat'] }[range][past ? 1 : 0];
+  const CAP = { tag: ['Heute übrig', 'Übrig an diesem Tag'], woche: ['Diese Woche übrig', 'Übrig in dieser Woche'], monat: ['Monat übrig', 'Übrig im Monat'] }[range][past ? 1 : 0];
   const NAME = { tag: 'Tageslimit', woche: 'Wochenbudget', monat: 'Monatsbudget' }[range];
-  const WHO = { tag: past ? 'An diesem Tag' : 'Heute', woche: past ? 'In dieser Woche' : 'Diese Woche', monat: past ? 'Im Budgetmonat' : 'Im Budgetmonat' }[range];
+  const WHO = { tag: past ? 'An diesem Tag' : 'Heute', woche: past ? 'In dieser Woche' : 'Diese Woche', monat: 'Im Monat' }[range];
   let state = `<span class="state ok">${icon('check')}Im Budget</span>`;
   if (!hasPlan) state = `<span class="state">${icon('info')}Noch kein Einkommen. <a href="#/plan" style="color:var(--accent);font-weight:700">Eintragen</a></span>`;
   else if (left < 0) state = `<span class="state bad">${icon('alert')}${WHO} um ${eur(-left)} überschritten</span>`;
   else if (p >= st.warnAt) state = `<span class="state warn">${icon('alert')}Fast aufgebraucht (${p} %)</span>`;
   const b = V.b;
   const slot = past ? (range === 'tag' ? dateLong(V.from) : `${dateShort(V.from)} – ${dateShort(V.to)}`)
-    : range === 'tag' ? (b.tomorrow == null ? 'Morgen: neuer Budgetmonat' : `Morgen: ${eur(b.tomorrow)}`)
-    : range === 'woche' ? `Noch ${b.daysLeftWeek} ${b.daysLeftWeek === 1 ? 'Tag' : 'Tage'} in dieser Woche` : `${dateShort(b.from)} – ${dateShort(b.to)}, noch ${b.daysLeft} ${b.daysLeft === 1 ? 'Tag' : 'Tage'}`;
+    : range === 'tag' ? (b.tomorrow == null ? 'Morgen: neuer Monat' : `Morgen: ${eur(b.tomorrow)}`)
+    : range === 'woche' ? `Noch ${b.daysLeftWeek} ${b.daysLeftWeek === 1 ? 'Tag' : 'Tage'} in dieser Woche` : `${periodShort(b.from, b.to)}, noch ${b.daysLeft} ${b.daysLeft === 1 ? 'Tag' : 'Tage'}`;
   const hero = `<section class="hero" aria-label="Budget"><div class="cap">${esc(CAP)}</div>
     <div class="big ${left < 0 ? 'over' : ''}">${hasPlan ? eur(left) : eur(0)}</div>
     <div class="sub"><button type="button" class="infolink" data-act="budget-info" aria-haspopup="dialog">${NAME} ${hasPlan ? eur(budgetV) : '–'}${icon('info')}</button><span>Ausgegeben ${eur(spent)}</span><span>${esc(slot)}</span></div>
     ${meterHtml(spent, hasPlan ? budgetV : 0, st.warnAt)}${state}</section>`;
   const label = range === 'tag' ? (off === 0 ? 'Heute' : off === -1 ? 'Gestern' : fmtD({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(Fin.dparse(V.from)))
-    : range === 'woche' ? `${off === 0 ? 'Diese Woche, ' : ''}${dateShort(V.from)} – ${dateShort(V.to)}` : `${dateShort(V.from)} – ${dateShort(V.to)} ${V.to.slice(0, 4)}`;
+    : range === 'woche' ? `${off === 0 ? 'Diese Woche, ' : ''}${dateShort(V.from)} – ${dateShort(V.to)}` : periodLabel(V.from, V.to);
   const earliest = d.txs.length ? d.txs[d.txs.length - 1].date : t, canBack = V.from > earliest;
   const NOW = { tag: 'Heute', woche: 'Diese Woche', monat: 'Jetzt' }[range];
-  const nav = `<div class="monthnav bnav"><button type="button" class="icon-btn" data-act="bnav" data-k="-1" aria-label="${range === 'tag' ? 'Früherer Tag' : range === 'woche' ? 'Frühere Woche' : 'Früherer Budgetmonat'}"${canBack ? '' : ' disabled'}>${icon('left')}</button>
+  const nav = `<div class="monthnav bnav"><button type="button" class="icon-btn" data-act="bnav" data-k="-1" aria-label="${range === 'tag' ? 'Früherer Tag' : range === 'woche' ? 'Frühere Woche' : 'Früherer Monat'}"${canBack ? '' : ' disabled'}>${icon('left')}</button>
     <div class="m" aria-live="polite">${esc(label)}</div>
-    <button type="button" class="icon-btn" data-act="bnav" data-k="1" aria-label="${range === 'tag' ? 'Späterer Tag' : range === 'woche' ? 'Spätere Woche' : 'Späterer Budgetmonat'}"${off >= 0 ? ' disabled' : ''}>${icon('right')}</button>
+    <button type="button" class="icon-btn" data-act="bnav" data-k="1" aria-label="${range === 'tag' ? 'Späterer Tag' : range === 'woche' ? 'Spätere Woche' : 'Späterer Monat'}"${off >= 0 ? ' disabled' : ''}>${icon('right')}</button>
     <button type="button" class="btn small" data-act="bnow"${off === 0 ? ' disabled' : ''}>${NOW}</button></div>`;
   const list = d.txs.filter((x) => x.date >= V.from && x.date <= V.to);
-  const sub = range === 'tag' ? dateLong(V.from) : range === 'woche' ? `Woche ${dateShort(V.from)} – ${dateShort(V.to)}` : `Budgetmonat ${dateShort(V.from)} – ${dateShort(V.to)}`;
+  const sub = range === 'tag' ? dateLong(V.from) : range === 'woche' ? `Woche ${dateShort(V.from)} – ${dateShort(V.to)}` : periodShort(V.from, V.to);
   return `<div class="view-wrap">${pageHead('Budget', { sub: dateLong(t) })}
     ${seg([{ id: 'tag', label: 'Tag', href: '#/heute/tag' }, { id: 'woche', label: 'Woche', href: '#/heute/woche' }, { id: 'monat', label: 'Monat', href: '#/heute/monat' }], range, 'Zeitraum')}
     ${nav}${hero}
@@ -80,7 +80,7 @@ function budgetSheetHtml(range, off) {
   const NAME = { tag: 'Tageslimit', woche: 'Wochenbudget', monat: 'Monatsbudget' }[range];
   const row = (k, v, total) => `<div class="${total ? 'total' : ''}"><dt class="${total ? 'k' : ''}">${k}</dt><dd>${v}</dd></div>`;
   const items = live('fixed').filter((f) => f.active !== false);
-  const base = [row('Einnahmen (Plan)', eur(b.income)), row('− Fixkosten', eur(b.fixed)), row('− Geplante Zahlungen', eur(b.planned)), row('− Sparrate', eur(b.savings)), row(`Verfügbar im Budgetmonat <span class="hint">(${dateShort(b.from)} – ${dateShort(b.to)})</span>`, eur(b.disposable), true)];
+  const base = [row('Einnahmen (Plan)', eur(b.income)), row('− Fixkosten', eur(b.fixed)), row('− Geplante Zahlungen', eur(b.planned)), row('− Sparrate', eur(b.savings)), row(`Verfügbar im Monat <span class="hint">(${periodShort(b.from, b.to)})</span>`, eur(b.disposable), true)];
   let rest = [], note = '';
   if (range === 'tag') {
     const before = Fin.round2(b.month.spent - b.day.spent);
@@ -90,9 +90,9 @@ function budgetSheetHtml(range, off) {
     const days = Math.round((Fin.dparse(V.to) - Fin.dparse(V.from)) / 864e5) + 1;
     if (past) rest = [row(`Tageslimit am ${dateShort(V.from)}`, eur(b.day.limit)), row('× Tage der Woche', String(days)), row(NAME, eur(V.limit), true)];
     else { const wb = Fin.round2(b.week.spent - b.day.spent); rest = [row('Tageslimit heute', eur(b.day.limit)), row('× Tage bis Wochenende', String(b.daysLeftWeek)), row('+ Diese Woche vor heute ausgegeben', eur(wb)), row(NAME, eur(V.limit), true)]; }
-    note = 'Die Woche ist der Teil, der in deinen Budgetmonat fällt.';
+    note = 'Die Woche ist der Teil, der in deinen Monat fällt.';
   } else {
-    rest = [row('− Ausgegeben im Budgetmonat', eur(V.spent)), row('= Übrig', eur(V.left), true)];
+    rest = [row('− Ausgegeben im Monat', eur(V.spent)), row('= Übrig', eur(V.left), true)];
   }
   const group = (title, list, fmt) => (list.length ? `<h3 style="margin-top:var(--s3)">${title}</h3><dl class="kv">${list.map(fmt).join('')}</dl>` : '');
   const inc = items.filter((f) => f.kind === 'income'), fx = items.filter((f) => f.kind !== 'income');

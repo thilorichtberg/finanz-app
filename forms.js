@@ -155,7 +155,7 @@ const FORM_DEFS = {
       save: (v) => { put('goal', Object.assign({}, g, { saved: Math.max(0, Fin.round2(g.saved + v.amount)) })); return { to: '#/plan/ziele', msg: `${eur(Math.abs(v.amount))} ${v.amount > 0 ? 'eingezahlt' : 'ausgezahlt'}` }; } }; },
   budget: () => { const s = settings();
     return { title: 'Budget & Sparrate', back: '#/einstellungen', intro: 'Einkommen und Fixkosten trägst du unter Plan → Fixkosten ein.', values: { savingsTarget: s.savingsTarget || '0', warnAt: s.warnAt, periodStart: s.periodStart || 1 },
-      fields: [{ n: 'periodStart', t: 'day', l: 'Budgetmonat beginnt am Tag', hint: 'Zum Beispiel 30, wenn dein Geld um den 30. kommt. Dann läuft der Budgetmonat vom 30. bis zum 29. Kürzere Monate nutzen ihren letzten Tag.' }, { n: 'savingsTarget', t: 'money', l: 'Sparrate pro Monat', zero: true, hint: 'Wird vor dem Tagesbudget zurückgelegt.' }, { n: 'warnAt', t: 'num', l: 'Warnen ab (Prozent)', min: 50, max: 100, err: 'Bitte eine Zahl zwischen 50 und 100.', hint: 'Gilt für das Tages-, Wochen- und Kategorie-Budget.' }],
+      fields: [{ n: 'periodStart', t: 'day', l: 'Monat beginnt am Tag', hint: 'Normalerweise 1: der Budgetmonat ist der Kalendermonat. Nur ändern, wenn du lieber ab einem anderen Tag rechnest, zum Beispiel 30 (dann vom 30. bis zum 29.). Kürzere Monate nutzen ihren letzten Tag.' }, { n: 'savingsTarget', t: 'money', l: 'Sparrate pro Monat', zero: true, hint: 'Wird vor dem Tagesbudget zurückgelegt.' }, { n: 'warnAt', t: 'num', l: 'Warnen ab (Prozent)', min: 50, max: 100, err: 'Bitte eine Zahl zwischen 50 und 100.', hint: 'Gilt für das Tages-, Wochen- und Kategorie-Budget.' }],
       save: (v) => { setSettings({ savingsTarget: v.savingsTarget, warnAt: v.warnAt, periodStart: v.periodStart }); return { to: '#/einstellungen', msg: 'Gespeichert' }; } }; },
 };
 
@@ -258,7 +258,7 @@ VIEWS.einstellungen = (r) => {
     ${ST('#/einstellungen/konto', 'user', 'Konto & Cloud', cloud.user ? 'Angemeldet, Abgleich ' + (cloud.state === 'ok' ? 'aktuell' : cloud.state === 'error' ? 'fehlgeschlagen' : cloud.state === 'busy' ? 'läuft …' : 'bereit') : sb ? 'Nicht angemeldet, Daten nur auf diesem Gerät' : 'Cloud nicht verfügbar')}
     ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', bankUI.state === 'ready' ? bankStatus().text : 'CSV importieren, Bank verbinden', bankUI.state === 'login' ? '<span class="badge warn">Anmelden</span>' : bankUI.state === 'off' ? '<span class="badge">Bank bald</span>' : '')}
     ${ST('#/einstellungen/konten', 'wallet', 'Konten', `${live('acct').length} ${live('acct').length === 1 ? 'Konto' : 'Konten'}`)}
-    ${ST('#/einstellungen/budget', 'target', 'Budget & Sparrate', `Budgetmonat ab dem ${st.periodStart || 1}. · Sparrate ${eur(st.savingsTarget)}`)}
+    ${ST('#/einstellungen/budget', 'target', 'Budget & Sparrate', `Monat ab dem ${st.periodStart || 1}. · Sparrate ${eur(st.savingsTarget)}`)}
     ${ST('#/einstellungen/kategorien', 'layers', 'Kategorien', `${d.cats.length} Kategorien, Budgets pro Kategorie`)}
     ${ST('#/einstellungen/regeln', 'tag', 'Eigene Regeln', `${live('rule').length} ${live('rule').length === 1 ? 'Regel' : 'Regeln'} für die Zuordnung`)}</div>
     <section class="section"><h2>Backup</h2><div class="panel"><p>Sichere alle Daten dieses Geräts als Datei oder spiele ein Backup zurück.</p><div class="btn-row"><button type="button" class="btn" data-act="export-json">${icon('download')}Exportieren</button><button type="button" class="btn" data-act="import-json">${icon('upload')}Importieren</button></div></div></section>

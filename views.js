@@ -5,6 +5,10 @@
 
 const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1, pq: '', warnOpen: false, bo: { tag: 0, woche: 0, monat: 0 } };
 const PIE_COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--pie-other)'];
+// Ist der Zeitraum ein ganzer Kalendermonat, heißt er wie der Monat; sonst Datum bis Datum
+const isCalMonth = (from, to) => { const a = Fin.dparse(from), z = Fin.dparse(to); return a.getDate() === 1 && a.getMonth() === z.getMonth() && a.getFullYear() === z.getFullYear() && z.getDate() === Fin.daysInMonth(z.getFullYear(), z.getMonth()); };
+const periodShort = (from, to) => (isCalMonth(from, to) ? MONTHS[Number(from.slice(5, 7)) - 1] : `${dateShort(from)} – ${dateShort(to)}`);
+const periodLabel = (from, to) => (isCalMonth(from, to) ? monthLabel(from.slice(0, 7)) : `${dateShort(from)} – ${dateShort(to)} ${to.slice(0, 4)}`);
 const T_UM = () => (uiMode === 'neu' ? 'Übersicht' : 'Umsätze');
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const MON_S = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -286,7 +290,7 @@ VIEWS.rueckblick = () => {
   const d = derived(), st = settings(), t = todayKey();
   const r = Fin.review({ txs: d.txs, cats: d.cats, fixed: live('fixed'), settings: st, today: t }, ui.rb);
   const nav = `<div class="monthnav"><button type="button" class="icon-btn" data-act="rb" data-k="1" aria-label="Früherer Budgetmonat">${icon('left')}</button>
-    <div class="m" aria-live="polite">${esc(dateShort(r.from))} – ${esc(dateShort(r.to))} ${esc(r.to.slice(0, 4))}</div>
+    <div class="m" aria-live="polite">${esc(periodLabel(r.from, r.to))}</div>
     <button type="button" class="icon-btn" data-act="rb" data-k="-1" aria-label="Späterer Budgetmonat"${ui.rb <= 1 ? ' disabled' : ''}>${icon('right')}</button></div>`;
   const head = pageHead('Rückblick', { back: '#/heute', backLabel: 'Zurück zu Heute', sub: ui.rb === 1 ? 'Letzter Budgetmonat' : `${ui.rb} Budgetmonate zurück` });
   if (!r.hasData) return `<div class="view-wrap">${head}${nav}${emptyBlock('Keine Umsätze', 'In diesem Budgetmonat gibt es keine Umsätze. Blättere weiter zurück.', '')}</div>`;
