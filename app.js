@@ -118,6 +118,8 @@ function derived() {
   }
   out.sort((a, b) => (b.date.localeCompare(a.date)) || (a.id < b.id ? 1 : -1));
   // Vorschläge: erkannte Wiederkehrer, die noch nicht als Fixposten eingetragen sind
+  const fixMatcher = Fin.fixedMatcher(live('fixed'));
+  for (const t of out) { const fid = fixMatcher(t); if (fid) t.fixedId = fid; }
   const rec = [], suggestions = [];                  // Wiederkehrendes wird nicht mehr automatisch erkannt: Fixkosten trägst du selbst ein
   const used = new Set(), byDue = live('planned').sort((a, b) => a.due.localeCompare(b.due));
   const planned = byDue.map((p) => Object.assign({}, p, { matched: !p.done && !!Fin.matchPlanned(p, out, used) }));
@@ -281,7 +283,7 @@ function parseRoute() {
   const p = h.split('/').filter(Boolean).map(decodeURIComponent);
   return { name: p[0] || 'heute', a: p[1] || '', b: p[2] || '', path: p };
 }
-const tabOf = (r) => ({ heute: 'heute', umsaetze: 'umsaetze', tx: 'umsaetze', kategorie: 'umsaetze', neu: r.b ? (['geplant', 'fix', 'einkommen', 'ziel', 'einzahlung'].includes(r.a) ? 'plan' : 'einstellungen') : 'neu', zuordnen: 'heute', rueckblick: 'heute', plan: 'plan', einstellungen: 'einstellungen' }[r.name] || 'heute');
+const tabOf = (r) => ({ heute: 'heute', umsaetze: 'umsaetze', tx: 'umsaetze', kategorie: 'umsaetze', neu: r.b ? (['geplant', 'fix', 'einkommen', 'ziel', 'einzahlung'].includes(r.a) ? 'plan' : 'einstellungen') : 'neu', zuordnen: 'heute', rueckblick: 'heute', beispiel: 'plan', plan: 'plan', einstellungen: 'einstellungen' }[r.name] || 'heute');
 let lastRouteKey = '', draft = null;
 function render(opts = {}) {
   const r = parseRoute(), key = location.hash;
@@ -308,9 +310,24 @@ function render(opts = {}) {
   if (VIEW_AFTER[r.name]) VIEW_AFTER[r.name](r, view);
   replayPress();
   if (typeof updateRefresh === 'function') updateRefresh();
+  updateDot();
 }
 const VIEWS = {}, VIEWS_NEU = {}, VIEW_AFTER = {};
-window.addEventListener('hashchange', () => { draft = null; render(); });
+/* Warnungen: Fixkosten über dem Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets, ablaufende Bank-Freigabe */
+function warnings() {
+  const d = derived(), list = Fin.warnings({ txs: d.txs, cats: d.cats, fixed: live('fixed'), settings: settings(), today: todayKey() });
+  if (typeof bankStatus === 'function') { const b = bankStatus(); if (/warn-text|over-text/.test(b.cls)) list.push({ id: 'bank', kind: 'bank', level: /over/.test(b.cls) ? 'bad' : 'warn', title: 'Bank-Freigabe', text: b.text, href: '#/einstellungen/bank' }); }
+  return list;
+}
+function updateDot() {
+  const a = $('.tabbar a[data-tab="einstellungen"]'); if (!a) return;
+  const n = warnings().length; let dot = a.querySelector('.dot');
+  if (n && !dot) { dot = document.createElement('span'); dot.className = 'dot'; dot.setAttribute('aria-hidden', 'true'); a.querySelector('.ico').append(dot); }
+  if (!n && dot) dot.remove();
+  a.setAttribute('aria-label', n ? `Einstellungen, ${n} ${n === 1 ? 'Warnung' : 'Warnungen'}` : 'Einstellungen');
+}
+let draftKeep = false;                                       // beim Gang zur Beispiel-Auswahl und zurück bleibt der Entwurf des Formulars erhalten
+window.addEventListener('hashchange', () => { if (draftKeep) draftKeep = false; else draft = null; render(); });
 const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
 
 /* ---------- Drück-Animation für jeden Knopf (R2.10) ---------- */

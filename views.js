@@ -3,7 +3,7 @@
    Finanzen – Ansichten: Heute, Umsätze, Kategorien, Berichte, Umsatz-Details
    ===================================================================== */
 
-const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1 };
+const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1, pq: '' };
 const PIE_COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--pie-other)'];
 const T_UM = () => (uiMode === 'neu' ? 'Übersicht' : 'Umsätze');
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -31,9 +31,9 @@ function seg(items, cur, label) {
 }
 function txRow(t, opt = {}) {
   const c = derived().cmap.get(t.cat) || catById(t.cat);
-  const meta = [c.name, opt.showDate ? dateShort(t.date) : '', t.by === 'recurring' ? 'wiederkehrend' : ''].filter(Boolean).join(' · ');
+  const meta = [c.name, opt.showDate ? dateShort(t.date) : '', t.fixedId ? 'Fixkosten, zählt nicht als Ausgabe' : ''].filter(Boolean).join(' · ');
   return `<a class="tx" href="#/tx/${encodeURIComponent(t.id)}" data-fid="tx-${esc(t.id)}"><span class="cat-ic">${icon(c.icon)}</span>
-    <span class="info"><span class="name">${esc(t.title)}</span><br><span class="meta">${esc(meta)}</span></span>${amt(t.amount, c.kind === 'transfer' ? 'muted' : '')}</a>`;
+    <span class="info"><span class="name">${esc(t.title)}</span><br><span class="meta">${esc(meta)}</span></span>${amt(t.amount, c.kind === 'transfer' || t.fixedId ? 'muted' : '')}</a>`;
 }
 function emptyBlock(title, text, btn) {
   return `<div class="empty"><h2>${esc(title)}</h2><p>${esc(text)}</p>${btn || ''}</div>`;
@@ -302,4 +302,24 @@ VIEWS.rueckblick = () => {
       <div><dt>Ausgaben zum Zeitraum davor</dt><dd>${r.prevExpense ? (dExp === 0 ? 'gleich' : (dExp > 0 ? '+' : '−') + eur(Math.abs(dExp))) : 'kein Vergleich'}</dd></div></dl>
     <section class="section"><h2>Die größten Ausgaben</h2>${top ? `<div class="list-block">${top}</div>` : '<p class="hint-line">Keine Ausgaben.</p>'}</section>
     <p class="hint-line" style="margin-top:var(--s4)">Das Budget rechnet mit deinen heutigen Fixposten. Umbuchungen zählen nicht mit.</p></div>`;
+};
+
+
+/* ---------- Beispiel-Buchung wählen (für Fixkosten und regelmäßiges Einkommen) ---------- */
+function pickListHtml() {
+  const r = parseRoute(), income = r.a === 'einkommen', q = Fin.fold(ui.pq || '').trim(), cmap = derived().cmap;
+  const list = derived().txs.filter((t) => {
+    const k = (cmap.get(t.cat) || {}).kind;
+    if (k === 'transfer' || t.ignore || t.autoIgnore) return false;
+    if (income ? !(t.amount > 0 && k !== 'refund') : !(t.amount < 0)) return false;
+    return !q || Fin.fold(`${t.title} ${t.name} ${t.purpose} ${t.amount}`).includes(q);
+  }).slice(0, 60);
+  if (!list.length) return `<div class="empty compact"><h2>Nichts gefunden</h2><p>${derived().txs.length ? 'Ändere den Suchbegriff.' : 'Importiere zuerst Umsätze oder verbinde die Bank.'}</p></div>`;
+  return `<div class="list-block">${list.map((t) => `<button type="button" class="tx" data-act="pick-example" data-id="${esc(t.id)}"><span class="cat-ic">${icon((cmap.get(t.cat) || {}).icon || 'dots')}</span><span class="info"><span class="name">${esc(t.title)}</span><br><span class="meta">${esc(dateShort(t.date))} · ${esc((cmap.get(t.cat) || {}).name || '')}</span></span>${amt(t.amount)}</button>`).join('')}</div>`;
+}
+VIEWS.beispiel = (r) => {
+  const income = r.a === 'einkommen', back = `#/neu/${r.a === 'einkommen' ? 'einkommen' : 'fix'}${r.b && r.b !== 'neu' ? '/' + encodeURIComponent(r.b) : ''}`;
+  return `<div class="view-wrap">${pageHead('Beispiel-Buchung wählen', { back, backLabel: 'Zurück zum Formular', sub: income ? 'Eine Einnahme, die dieses Einkommen zeigt' : 'Eine Abbuchung dieser Fixkosten' })}
+    <label class="search" style="margin-bottom:var(--s3);display:block"><span class="sr">Buchungen durchsuchen</span>${icon('search')}<input type="search" id="pq" data-fid="pq" value="${esc(ui.pq || '')}" placeholder="Suchen" autocomplete="off" enterkeyhint="search"></label>
+    <div id="pklist" data-live>${pickListHtml()}</div></div>`;
 };

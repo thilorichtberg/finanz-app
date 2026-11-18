@@ -33,7 +33,6 @@
 
   /* ---------- Kategorien ---------- */
   // kind: expense | income | refund (senkt Ausgaben) | transfer (zählt nirgends)
-  // fixed: Fixkosten, werden vom Budget vorab abgezogen und zählen nicht als „variable" Ausgabe
   Fin.CATEGORIES = [
     { id: 'lebensmittel', name: 'Lebensmittel', icon: 'cart', kind: 'expense' },
     { id: 'drogerie', name: 'Drogerie & Haushalt', icon: 'bag', kind: 'expense' },
@@ -45,10 +44,10 @@
     { id: 'gesundheit', name: 'Gesundheit', icon: 'heart', kind: 'expense' },
     { id: 'bargeld', name: 'Bargeld', icon: 'cash', kind: 'expense' },
     { id: 'kreditkarte', name: 'Kreditkarte', icon: 'card', kind: 'expense' },
-    { id: 'abos', name: 'Abos & Mitgliedschaften', icon: 'repeat', kind: 'expense', fixed: true },
-    { id: 'wohnen', name: 'Wohnen & Energie', icon: 'home', kind: 'expense', fixed: true },
-    { id: 'telefon', name: 'Telefon & Internet', icon: 'phone', kind: 'expense', fixed: true },
-    { id: 'versicherung', name: 'Versicherung', icon: 'shield', kind: 'expense', fixed: true },
+    { id: 'abos', name: 'Abos & Mitgliedschaften', icon: 'repeat', kind: 'expense' },
+    { id: 'wohnen', name: 'Wohnen & Energie', icon: 'home', kind: 'expense' },
+    { id: 'telefon', name: 'Telefon & Internet', icon: 'phone', kind: 'expense' },
+    { id: 'versicherung', name: 'Versicherung', icon: 'shield', kind: 'expense' },
     { id: 'gebuehren', name: 'Bankgebühren', icon: 'landmark', kind: 'expense' },
     { id: 'sonstiges', name: 'Sonstiges', icon: 'dots', kind: 'expense' },
     { id: 'einkommen', name: 'Einkommen', icon: 'trend', kind: 'income' },
@@ -300,17 +299,17 @@
      Tageslimit = (Verfügbar − bisher ausgegeben vor heute) / verbleibende Tage inkl. heute.
      Überziehst du heute, sinkt das Limit für alle Folgetage automatisch (die Formel rechnet jeden Tag neu). */
   Fin.catMap = (cats) => { const m = new Map(); for (const c of cats) m.set(c.id, c); return m; };
-  // Fixkosten-Kategorie (in den Einstellungen → Kategorien einstellbar): Buchungen dort zählen nicht zum Tageslimit
-  Fin.isFixedTx = (tx, cmap) => {
-    if (tx.amount >= 0) return false;
-    const c = cmap.get(tx.cat);
-    return !!(c && c.fixed);
+  // Eine Buchung gehört zu einem Fixposten, wenn ihr Text (Name, Verwendungszweck, bei PayPal der Händler) den „Erkennungs-Text" des Postens enthält
+  // und die Richtung stimmt (Fixkosten = Ausgabe, Einkommen = Einnahme). Kommt aus der Beispiel-Buchung, ist aber frei änderbar.
+  Fin.fixedMatcher = (items) => {
+    const list = items.filter((f) => !f.deleted && f.active !== false && f.kind !== 'income' && String(f.match || '').trim()).map((f, i) => ({ id: f.id || 'fx' + i, text: fold(f.match).trim() }));
+    return (tx) => { if (!(tx.amount < 0) || !list.length) return null; const h = tx.hay || Fin.haystack(tx); for (const m of list) if (h.includes(m.text)) return m.id; return null; };
   };
-  Fin.variableSpend = (tx, cmap) => {
+  Fin.variableSpend = (tx, cmap, matcher) => {
     const c = cmap.get(tx.cat) || { kind: tx.amount < 0 ? 'expense' : 'income' };
     if (tx.ignore || tx.autoIgnore || c.kind === 'transfer' || c.kind === 'income') return 0;
     if (c.kind === 'refund') return tx.amount > 0 ? -tx.amount : 0;
-    if (Fin.isFixedTx(tx, cmap)) return 0;
+    if (tx.amount < 0 && (tx.fixedId || (matcher && matcher(tx)))) return 0;       // gehört zu einem Fixposten: zählt nicht als Ausgabe im Budget
     return tx.amount < 0 ? -tx.amount : 0;
   };
   // Geplante Zahlung gilt als erledigt, wenn ein passender Umsatz kommt: Betrag ±5 %, Datum ±10 Tage, Name (erstes Wort) kommt vor
@@ -347,23 +346,18 @@
     const active = fixed.filter((f) => f.active !== false && !f.deleted);
     const income = round2(active.filter((f) => f.kind === 'income').reduce((s, f) => s + Math.abs(f.amount), 0));
     const expItems = active.filter((f) => f.kind !== 'income');
+    // Fixkosten: der feste Betrag, den du angibst, jeden Budgetmonat. Gehört eine Buchung zu einem Fixposten (Beispiel-Buchung), zählt sie nicht als Ausgabe:
+    // zwei Abbuchungen in einem und keine im nächsten Monat bringen nichts durcheinander.
+    const matcher = Fin.fixedMatcher(expItems);
     const fixedPlan = round2(expItems.reduce((s, f) => s + Math.abs(f.amount), 0));
-    // Fixkosten gelten je Fixkosten-Kategorie: mindestens die Summe deiner Posten dort, bei höheren Buchungen der gebuchte Betrag
-    // (ungeplante Rechnungen oder zwei Monate auf einmal zählen also, nicht abgebuchte Posten bleiben mit ihrem Betrag stehen).
-    // Posten in einer Kategorie ohne Fixkosten-Flag zählen mit ihrem Betrag, ihre Buchungen bleiben variabel (Kategorie anpassen!).
-    const fixedCats = new Set([...cmap.values()].filter((c) => c.fixed).map((c) => c.id));
-    const planBy = new Map(), actBy = new Map(); let planOther = 0;
-    for (const f of expItems) { if (fixedCats.has(f.cat)) planBy.set(f.cat, (planBy.get(f.cat) || 0) + Math.abs(f.amount)); else planOther += Math.abs(f.amount); }
-    for (const t of txs) if (t.date >= ms && t.date <= me && !t.ignore && !t.autoIgnore && t.amount < 0 && fixedCats.has(t.cat)) actBy.set(t.cat, (actBy.get(t.cat) || 0) - t.amount);
-    let fixedSum = planOther, fixedActual = planOther;
-    for (const c of fixedCats) { fixedSum += Math.max(planBy.get(c) || 0, actBy.get(c) || 0); fixedActual += actBy.get(c) || 0; }
-    fixedSum = round2(fixedSum); fixedActual = round2(fixedActual);
+    const fixedSum = fixedPlan;
+    const fixedActual = round2(txs.reduce((s, t) => (t.date >= ms && t.date <= me && !t.ignore && !t.autoIgnore && t.amount < 0 && (t.fixedId || matcher(t)) ? s - t.amount : s), 0));
     // Offene geplante Zahlungen: fällig bis Monatsende, auch überfällige (so lange nicht abgehakt oder im Umsatz gefunden)
     const plannedOpen = planned.filter((p) => !p.deleted && !p.done && p.due <= me && !(p.matched));
     const plannedSum = round2(plannedOpen.reduce((s, p) => s + Math.abs(p.amount), 0));
     const savings = round2(Number(settings.savingsTarget) || 0);
     const disposable = round2(income - fixedSum - plannedSum - savings);
-    const spendOn = (a, b) => round2(txs.reduce((s, t) => (t.date >= a && t.date <= b ? s + Fin.variableSpend(t, cmap) : s), 0));
+    const spendOn = (a, b) => round2(txs.reduce((s, t) => (t.date >= a && t.date <= b ? s + Fin.variableSpend(t, cmap, matcher) : s), 0));
     const spentMonth = spendOn(ms, today), spentToday = spendOn(today, today), spentBeforeToday = round2(spentMonth - spentToday);
     const limitToday = Math.max(0, round2((disposable - spentBeforeToday) / daysLeft));
     const wStart = Fin.weekStart(today), wEnd = Fin.addDays(wStart, 6);
@@ -447,6 +441,29 @@
       else if (Math.abs(actual - plan) > plan * 0.05) status = 'diff';
       return { id: f.id, name: f.name, plan, actual, diff: round2(actual - plan), last, due, status };
     });
+  };
+  // Warnungen für den Reiter „Warnungen“ (Einstellungen): Fixkosten über dem angegebenen Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets
+  Fin.warnings = ({ txs, cats, fixed = [], settings = {}, today }) => {
+    const out = [], sd = settings.periodStart || 1, warnAt = settings.warnAt || 80;
+    const cur = Fin.period(today, sd), p1 = Fin.period(Fin.addDays(cur.from, -1), sd), p2 = Fin.period(Fin.addDays(p1.from, -1), sd);
+    // 1) Fixkosten: wurde im Zeitfenster (bis zu 3 Budgetmonate, erst ab der ersten passenden Buchung) mehr abgebucht als angegeben?
+    //    Zeitfenster statt Einzelmonat: doppelt abgebucht und dafür im anderen Monat nicht, ist keine Warnung.
+    for (const f of fixed.filter((x) => !x.deleted && x.active !== false && x.kind !== 'income' && String(x.match || '').trim())) {
+      const m = Fin.fixedMatcher([f]), mine = txs.filter((t) => !t.ignore && !t.autoIgnore && m(t));
+      if (!mine.length) continue;
+      const first = mine.map((t) => t.date).sort()[0], periods = [p2, p1, cur].filter((p) => p.to >= first);
+      const paid = round2(mine.filter((t) => t.date >= periods[0].from && t.date <= cur.to).reduce((s, t) => s - t.amount, 0)), expected = round2(Math.abs(f.amount) * periods.length);
+      if (paid > expected * 1.05 + 1) out.push({ id: 'fix-' + f.id, kind: 'fix', level: 'warn', title: f.name, text: `${Fin.eur(paid)} in ${periods.length} ${periods.length === 1 ? 'Budgetmonat' : 'Budgetmonaten'} abgebucht, angegeben sind ${Fin.eur(expected)}. Betrag anpassen?`, href: '#/neu/fix/' + encodeURIComponent(f.id) });
+    }
+    // 2) Einkommen
+    for (const c of Fin.incomeCheck({ txs, fixed, settings, today })) {
+      if (c.status === 'late') out.push({ id: 'inc-' + c.id, kind: 'income', level: 'warn', title: c.name, text: `Noch nicht eingegangen, erwartet am ${c.due.slice(8, 10)}.${c.due.slice(5, 7)}.`, href: '#/neu/einkommen/' + encodeURIComponent(c.id) });
+      else if (c.status === 'diff') out.push({ id: 'inc-' + c.id, kind: 'income', level: 'warn', title: c.name, text: `${Fin.eur(c.actual)} eingegangen, angegeben sind ${Fin.eur(c.plan)}.`, href: '#/neu/einkommen/' + encodeURIComponent(c.id) });
+    }
+    // 3) Kategorie-Budgets
+    const sums = new Map(Fin.byCategory(txs, cats, cur.from, cur.to).map((x) => [x.id, x.total]));
+    for (const c of cats) if (c.budget > 0) { const sp = sums.get(c.id) || 0, p = Math.round((sp / c.budget) * 100); if (p >= warnAt) out.push({ id: 'cat-' + c.id, kind: 'cat', level: p >= 100 ? 'bad' : 'warn', title: c.name, text: `${p} % des Monatsbudgets von ${Fin.eur(c.budget)} verbraucht`, href: '#/kategorie/' + c.id }); }
+    return out;
   };
   // Nächste Fälligkeit eines Fixpostens (Tag im Monat, auf Monatsende gekürzt)
   Fin.nextDue = (day, today) => {

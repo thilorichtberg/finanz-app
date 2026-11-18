@@ -34,8 +34,14 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     await page.fill('#f-name', 'Zuschuss Dad'); await page.fill('#f-amount', '590'); await page.fill('#f-day', '30'); await page.fill('#f-match', 'richtberg martin'); await page.click('.gform [type=submit]'); await page.waitForSelector('.kv');
     await nav('#/neu/fix', 'form-fix2'); await page.click('.gform [type=submit]'); // leer: Fehler
     if (!(await page.textContent('#e-name')).includes('Bitte')) bad(`${tag} Formularfehler fehlt`);
-    await page.fill('#f-name', 'Miete'); await page.fill('#f-amount', '1,5'); await page.fill('#f-day', '3'); await page.click('.gform [type=submit]');
-    for (const r of ['heute/tag', 'heute/woche', 'heute/monat', 'umsaetze', 'umsaetze/kategorien', 'umsaetze/berichte', 'plan', 'plan/geplant', 'plan/ziele', 'zuordnen', 'rueckblick', 'neu', 'neu/ausgabe', 'neu/einnahme', 'neu/geplant', 'neu/einkommen', 'neu/ziel', 'neu/regel', 'einstellungen', 'einstellungen/konto', 'einstellungen/bank', 'einstellungen/konten', 'einstellungen/regeln', 'einstellungen/kategorien', 'einstellungen/budget']) await nav('#/' + r, r.replace('/', '-'));
+    // Beispiel-Abbuchung wählen: Entwurf bleibt erhalten, Erkennung wird vorbelegt
+    await page.fill('#f-name', 'Strom'); await page.click('[data-act=open-picker]'); await page.waitForSelector('#pklist .tx'); await check('beispiel-wahl');
+    await page.click('#pklist .tx'); await page.waitForSelector('#f-example', { state: 'attached' }); await check('form-fix-mit-beispiel');
+    if (!(await page.inputValue('#f-example'))) bad(`${tag} Beispiel-Buchung nicht übernommen`);
+    if ((await page.inputValue('#f-name')) !== 'Strom') bad(`${tag} Entwurf (Name) ging verloren`);
+    if (!(await page.inputValue('#f-match')).trim()) bad(`${tag} Erkennungstext nicht vorbelegt`);
+    await page.fill('#f-amount', '1,5'); await page.fill('#f-day', '3'); await page.click('.gform [type=submit]');
+    for (const r of ['heute/tag', 'heute/woche', 'heute/monat', 'umsaetze', 'umsaetze/kategorien', 'umsaetze/berichte', 'plan', 'plan/geplant', 'plan/ziele', 'zuordnen', 'rueckblick', 'neu', 'neu/ausgabe', 'neu/einnahme', 'neu/geplant', 'neu/einkommen', 'neu/ziel', 'neu/regel', 'einstellungen', 'einstellungen/konto', 'einstellungen/warnungen', 'einstellungen/bank', 'einstellungen/konten', 'einstellungen/regeln', 'einstellungen/kategorien', 'einstellungen/budget']) await nav('#/' + r, r.replace('/', '-'));
     // 3. Umsatz öffnen, Regel anlegen
     await nav('#/umsaetze', 'liste'); await page.fill('#q', 'dad'); await page.waitForTimeout(60); await page.click('#txlist a.tx');
     await page.waitForSelector('#tx-form'); await check('tx-detail'); await page.selectOption('#f-cat', 'einkommen'); await page.check('#f-rule'); await check('tx-regel'); await page.click('#tx-form [type=submit]');

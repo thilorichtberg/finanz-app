@@ -12,7 +12,7 @@ function groupedTxHtml(list) {
   const flush = () => { if (cur) html += `<div class="day-head"><span>${esc(dayLabel(cur))}</span><span>${signed(sum)}</span></div><div class="list-block">${buf}</div>`; };
   for (const t of list) {
     if (t.date !== cur) { flush(); cur = t.date; sum = 0; buf = ''; }
-    buf += txRow(t); if ((cmap.get(t.cat) || {}).kind !== 'transfer' && !t.ignore && !t.autoIgnore) sum += t.amount;
+    buf += txRow(t); if ((cmap.get(t.cat) || {}).kind !== 'transfer' && !t.ignore && !t.autoIgnore && !t.fixedId) sum += t.amount;
   }
   flush();
   return html;

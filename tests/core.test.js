@@ -67,10 +67,10 @@ t('Budget: Tageslimit sinkt nach Überziehen', () => {
   const sameDay = Fin.budget({ ...base, txs, today: '2026-11-01' });
   assert.equal(sameDay.day.left, -60); assert.equal(sameDay.tomorrow, Fin.round2(520 / 29));
 });
-t('Budget: Fixkosten-Kategorien, Umbuchung und Erstattung', () => {
+t('Budget: Umbuchung zählt nicht, Erstattung mindert', () => {
   const base = { cats, fixed: [{ kind: 'income', amount: 1000 }], planned: [], settings: {} };
   const txs = [{ date: '2026-11-03', amount: -60, cat: 'wohnen' }, { date: '2026-11-03', amount: -500, cat: 'umbuchung' }, { date: '2026-11-03', amount: -10, cat: 'essen' }, { date: '2026-11-03', amount: 4, cat: 'erstattung' }];
-  assert.equal(Fin.budget({ ...base, txs, today: '2026-11-03' }).month.spent, 6);
+  assert.equal(Fin.budget({ ...base, txs, today: '2026-11-03' }).month.spent, 66);   // 60 Wohnen + 10 Essen - 4 Erstattung, Umbuchung zählt nicht
 });
 t('Budget: geplante Zahlung senkt das Limit, erledigte nicht', () => {
   const base = { cats, fixed: [{ kind: 'income', amount: 900 }], settings: {}, txs: [], today: '2026-11-01' };
@@ -84,10 +84,6 @@ t('Budget: letzter Tag im Monat und Woche am Monatsrand', () => {
 });
 t('Beträge: Tausenderpunkt und Dezimalkomma', () => {
   assert.equal(Fin.parseAmount('2.500'), 2500); assert.equal(Fin.parseAmount('1.234,56'), 1234.56); assert.equal(Fin.parseAmount('12.5'), 12.5); assert.equal(Fin.parseAmount('1.000.000'), 1000000); assert.equal(Fin.parseAmount('-20'), -20); assert.equal(Fin.parseAmount('12,50'), 12.5);
-});
-t('Budget: ungeplante Fixkosten mindern das Budget (Ist statt Plan)', () => {
-  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -60, cat: 'abos', name: 'Netflix' }], today: '2026-11-03' });
-  assert.equal(b.fixed, 60); assert.equal(b.disposable, 940); assert.equal(b.month.spent, 0);
 });
 t('Geplant: überfällig zählt weiter, Treffer im Umsatz erledigt es', () => {
   const base = { cats, fixed: [{ kind: 'income', amount: 900 }], settings: {}, txs: [], today: '2026-11-10' };
@@ -119,8 +115,8 @@ t('groupSeed: PayPal-Händler, Abrechner leer, normaler Name', () => {
 });
 t('Beträge: weitere Schreibweisen', () => { assert.equal(Fin.parseAmount('+5'), 5); assert.equal(Fin.parseAmount('-1.234'), -1234); assert.equal(Fin.parseAmount('1,234.56'), 1234.56); });
 t('Budget: Ist über Plan bei Fixkosten nimmt den höheren Wert', () => {
-  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30, cat: 'abos' }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -80, cat: 'abos', name: 'x' }], today: '2026-11-03' });
-  assert.equal(b.fixed, 80);
+  const b = Fin.budget({ cats, fixed: [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30, match: 'x', active: true }], planned: [], settings: {}, txs: [{ date: '2026-11-02', amount: -80, cat: 'abos', name: 'x' }], today: '2026-11-03' });
+  assert.equal(b.fixed, 30);
 });
 t('Budgetzeitraum ab Tag 30', () => {
   assert.deepEqual(Fin.period('2026-11-18', 30), { from: '2026-10-30', to: '2026-11-29' });
@@ -159,15 +155,30 @@ t('Rückblick: letzter Budgetzeitraum, Summen, Top-Kategorien, gehalten oder nic
   assert.equal(r.spent, 150); assert.equal(r.kept, true); assert.equal(r.top[0].id, 'lebensmittel'); assert.equal(r.top[0].prev, 30); assert.equal(r.prevExpense, 30);
   assert.equal(Fin.review({ txs, cats, fixed: [{ kind: 'income', amount: 100, active: true }], settings: {}, today: '2026-11-18' }).kept, false);
 });
-t('Fixkosten je Kategorie: höherer Wert aus Posten und Buchungen, veralteter Posten bleibt, Posten außerhalb zählt mit Plan', () => {
-  const fixed = [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -30, cat: 'abos' }, { kind: 'expense', amount: -40, cat: 'abos' }, { kind: 'expense', amount: -68, cat: 'wohnen' }, { kind: 'expense', amount: -20, cat: 'sonstiges' }];
-  const tx = (c, a, d = '2026-11-02') => ({ date: d, amount: a, cat: c, name: 'x' });
+t('Fixkosten: fester Betrag, passende Buchungen zählen nicht als Ausgabe, doppelte Abbuchung bringt nichts durcheinander', () => {
+  const fixed = [{ kind: 'income', amount: 1000 }, { kind: 'expense', amount: -43, match: 'verkehrs', active: true }, { kind: 'expense', amount: -29.9, match: 'hommer', active: true }];
+  const tx = (n, a, d = '2026-11-02') => ({ date: d, amount: a, cat: 'abos', name: n, purpose: '' });
   const b = (txs) => Fin.budget({ cats, fixed, planned: [], settings: {}, txs, today: '2026-11-03' });
-  assert.equal(b([]).fixed, 70 + 68 + 20);                                        // nichts gebucht: Pläne zählen (auch nicht mehr abgebuchte)
-  assert.equal(b([tx('abos', -29.9), tx('wohnen', -68)]).fixed, 70 + 68 + 20);    // gebucht unter Plan: Plan gilt
-  assert.equal(b([tx('abos', -29.9), tx('abos', -86)]).fixed, 115.9 + 68 + 20);   // gebucht über Plan (zwei Monate auf einmal): Ist gilt
-  assert.equal(b([tx('versicherung', -50)]).fixed, 70 + 68 + 20 + 50);            // ungeplante Rechnung in einer Fixkosten-Kategorie zählt
-  assert.equal(b([tx('sonstiges', -20)]).month.spent, 20);                        // Buchung in einer Nicht-Fixkosten-Kategorie bleibt variabel
+  assert.equal(b([]).fixed, 72.9);                                                     // nichts gebucht: der feste Betrag gilt trotzdem
+  assert.equal(b([tx('Muenchner Verkehrsgesellschaft', -86), tx('Hommer Fitness', -29.9)]).fixed, 72.9);   // doppelt abgebucht: Betrag bleibt
+  assert.equal(b([tx('Muenchner Verkehrsgesellschaft', -86), tx('Hommer Fitness', -29.9)]).month.spent, 0); // und zählt nicht als Ausgabe
+  assert.equal(b([tx('Netflix', -13)]).month.spent, 13);                               // ohne Fixposten bleibt es eine normale Ausgabe
+  assert.equal(b([tx('Hommer Fitness', 5)]).month.spent, 0);
+});
+t('Warnungen: nur bei echter Erhöhung, nicht bei verschobener Doppelbuchung', () => {
+  const item = { id: 'f', kind: 'expense', name: 'MVG', amount: -43, match: 'verkehrs', active: true };
+  const tx = (d, a) => ({ date: d, amount: a, cat: 'abos', name: 'Muenchner Verkehrsgesellschaft', purpose: '' });
+  const w = (txs, today = '2026-11-18') => Fin.warnings({ txs, cats, fixed: [item], settings: { periodStart: 30 }, today }).filter((x) => x.kind === 'fix');
+  assert.equal(w([tx('2026-09-01', -43), tx('2026-11-02', -86)]).length, 0);           // Oktober ausgefallen, November doppelt: alles gut
+  assert.equal(w([tx('2026-09-01', -50), tx('2026-10-01', -50), tx('2026-11-02', -50)]).length, 1);   // dauerhaft 50 statt 43
+  assert.equal(w([tx('2026-11-02', -80)]).length, 1);                                  // erste Buchung gleich zu hoch
+  assert.equal(w([tx('2026-11-02', -43)]).length, 0);
+  assert.equal(w([]).length, 0);
+});
+t('Warnungen: Kategorie-Budget ab Schwelle', () => {
+  const c2 = cats.map((c) => (c.id === 'essen' ? { ...c, budget: 100 } : c));
+  const out = Fin.warnings({ txs: [{ date: '2026-11-05', amount: -85, cat: 'essen' }], cats: c2, fixed: [], settings: {}, today: '2026-11-18' });
+  assert.equal(out.length, 1); assert.equal(out[0].kind, 'cat'); assert.equal(out[0].level, 'warn');
 });
 t('Gehalt-Abweichung: ok, abweichend, ausstehend, überfällig, Teilzahlungen werden summiert', () => {
   const dad = (d, a) => ({ date: d, amount: a, name: 'RICHTBERG MARTIN', purpose: 'Von Dad', cat: 'einkommen' });

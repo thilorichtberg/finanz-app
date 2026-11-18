@@ -19,7 +19,7 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 
 ## Oberfläche (Alt/Neu)
 
-Übergangsweise gibt es oben in der Mitte einen Schalter **Alt | Neu**. „Neu“ hat andere Symbole unten und diese Reihenfolge: **Budget** (Zeitraum-Schalter, „Heute übrig“, alle Ein- und Ausgaben des Zeitraums), **Übersicht** (Liste, Kategorien mit Tortendiagramm, Berichte), **Neu**, **Plan** (Fixkosten zuerst) und **Einstellungen**. Fixkosten und Einkommen trägst du selbst ein, es gibt keine automatische Erkennung wiederkehrender Zahlungen mehr, nur die Kategorien-Erkennung.
+Übergangsweise gibt es oben in der Mitte einen Schalter **Alt | Neu**. „Neu“ hat andere Symbole unten und diese Reihenfolge: **Budget** (Zeitraum-Schalter, „Heute übrig“, alle Ein- und Ausgaben des Zeitraums), **Übersicht** (Liste, Kategorien mit Tortendiagramm, Berichte), **Neu**, **Plan** (Fixkosten zuerst) und **Einstellungen**. Fixkosten und Einkommen trägst du selbst ein (fester Monatsbetrag, optional mit Beispiel-Buchung zur Erkennung), es gibt keine automatische Erkennung wiederkehrender Zahlungen mehr, nur die Kategorien-Erkennung. Einstellungen → **Warnungen** sammelt Hinweise (Fixkosten dauerhaft über dem Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets, ablaufende Bank-Freigabe); ein roter Punkt am Einstellungen-Symbol zeigt, dass etwas wartet.
 
 ## So rechnet das Budget
 
@@ -28,7 +28,7 @@ Verfügbar im Monat = Einnahmen (Plan) − Fixkosten − offene geplante Zahlung
 Tageslimit heute   = (Verfügbar − bisher variabel ausgegeben vor heute) ÷ verbleibende Tage inkl. heute
 ```
 
-Variabel ist jede Ausgabe in einer Kategorie, die nicht als Fixkosten markiert ist. Fixkosten gelten je Fixkosten-Kategorie: mindestens die Summe deiner Posten dort, bei höheren Buchungen der gebuchte Betrag. Umbuchungen zählen nirgends, Erstattungen mindern die Ausgaben. Die Formel wird jeden Tag neu gerechnet, deshalb sinkt das Limit automatisch, wenn du überziehst. Die Logik steht in [`core.js`](core.js) und ist in `tests/core.test.js` getestet.
+Variabel ist jede Ausgabe in einer Kategorie, die nicht als Fixkosten markiert ist. Fixkosten sind der feste Betrag, den du angibst, jeden Budgetmonat. Buchungen, die zu einem Fixposten passen (über seine Beispiel-Buchung erkannt), zählen nicht als Ausgabe, auch wenn sie mal doppelt oder gar nicht kommen. Umbuchungen zählen nirgends, Erstattungen mindern die Ausgaben. Die Formel wird jeden Tag neu gerechnet, deshalb sinkt das Limit automatisch, wenn du überziehst. Die Logik steht in [`core.js`](core.js) und ist in `tests/core.test.js` getestet.
 
 ## Mit Habits verbunden
 

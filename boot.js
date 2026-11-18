@@ -111,10 +111,30 @@ document.addEventListener('click', (e) => {
     case 'bank-sync': bankSync(); break;
     case 'tx-to-fixed': {
       const t = derived().txs.find((x) => x.id === id); if (!t) break;
-      const c = derived().cmap.get(t.cat);
-      if (t.amount > 0) put('fixed', { id: uid('fx'), kind: 'income', name: t.title, amount: t.amount, day: Number(t.date.slice(8, 10)), active: true, match: Fin.groupSeed(t) || t.name || '' });
-      else put('fixed', { id: uid('fx'), kind: 'expense', name: t.title, amount: t.amount, day: Number(t.date.slice(8, 10)), active: true, cat: c && c.fixed ? t.cat : 'abos' });
+      const base = { id: uid('fx'), name: t.title, day: Number(t.date.slice(8, 10)), active: true, match: Fin.groupSeed(t) || t.name || '', example: { id: t.id, date: t.date, amount: t.amount, title: t.title } };
+      put('fixed', t.amount > 0 ? Object.assign(base, { kind: 'income', amount: t.amount }) : Object.assign(base, { kind: 'expense', amount: t.amount }));
       toast(t.amount > 0 ? `„${t.title}“ zählt jetzt als regelmäßiges Einkommen` : `„${t.title}“ als Fixkosten eingetragen`); go('#/plan/fix'); break;
+    }
+    case 'open-picker': {
+      const form = el.closest('.gform'); if (!form) break;
+      captureDraft(form); draftKeep = true;
+      go(`#/beispiel/${form.dataset.type === 'einkommen' ? 'einkommen' : 'fix'}/${form.dataset.id ? encodeURIComponent(form.dataset.id) : 'neu'}`); break;
+    }
+    case 'clear-example': {
+      const form = el.closest('.gform'); if (!form) break;
+      captureDraft(form); draft.vals.example = ''; render({ force: true }); break;
+    }
+    case 'pick-example': {
+      const r = parseRoute(), type = r.a === 'einkommen' ? 'einkommen' : 'fix', formId = r.b && r.b !== 'neu' ? r.b : '';
+      const t = derived().txs.find((x) => x.id === id); if (!t) break;
+      if (!draft || draft.type !== type || draft.id !== formId) draft = { type, id: formId, vals: {} };
+      const v = draft.vals; v.example = t.id;
+      if (!String(v.match || '').trim()) v.match = Fin.groupSeed(t) || t.name || '';
+      if (!String(v.name || '').trim()) v.name = t.title;
+      if (!String(v.amount || '').trim()) v.amount = String(Math.abs(t.amount)).replace('.', ',');
+      if (!v.day || v.day === '1') v.day = String(Number(t.date.slice(8, 10)));
+      if (v.active === undefined) v.active = true;
+      draftKeep = true; location.hash = `#/neu/${type === 'einkommen' ? 'einkommen' : 'fix'}${formId ? '/' + encodeURIComponent(formId) : ''}`; break;
     }
     case 'sync-now': runSync(false); break;
     case 'signout': openSheet(`<div class="sheet-head"><h2 id="sheet-title">Abmelden</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
@@ -142,7 +162,7 @@ document.addEventListener('click', (e) => {
     }); break;
   }
 });
-document.addEventListener('input', (e) => { if (e.target.id === 'q') { ui.q = e.target.value; ui.limit = 60; $('#txlist').innerHTML = txListHtml(); } });
+document.addEventListener('input', (e) => { if (e.target.id === 'pq') { ui.pq = e.target.value; $('#pklist').innerHTML = pickListHtml(); return; } if (e.target.id === 'q') { ui.q = e.target.value; ui.limit = 60; $('#txlist').innerHTML = txListHtml(); } });
 
 /* ---------- Bank-Anbindung (Edge Function bank-sync) ---------- */
 function askSheet(title, text, label, run) {                 // Rückfrage ohne Gefahr: Hauptknopf in Akzentfarbe

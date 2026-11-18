@@ -481,6 +481,15 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 .pie .pie-cap { fill: var(--muted); font-size: 12px; }
 .sw { width: 12px; height: 12px; border-radius: 4px; flex: none; display: inline-block; }
 
+/* Punkt am Einstellungen-Symbol, wenn Warnungen vorliegen; Beispiel-Buchung im Formular */
+.tabbar .ico { position: relative; }
+.tabbar .dot { position: absolute; top: -3px; right: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bg); }
+.amt.muted { color: var(--muted); font-weight: 600; }
+.example { display: grid; gap: 2px; padding: var(--s3); background: var(--surface-2); border-radius: var(--r-sm); }
+.example .name { font-weight: 600; overflow-wrap: anywhere; } .example .meta { color: var(--muted); font-size: .875rem; }
+.field .lbl { font-weight: 600; font-size: .9375rem; }
+.field .btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
 /* Bausteine aus Habits, die oben nicht mitkopiert wurden */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s4); display: grid; gap: var(--s3); }
 .panel p { font-size: .9375rem; color: var(--muted); }
