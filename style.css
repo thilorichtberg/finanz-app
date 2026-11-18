@@ -485,6 +485,12 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 .pie-center .pc-sub { color: var(--muted); font-size: .8125rem; font-variant-numeric: tabular-nums; }
 .sw { width: 12px; height: 12px; border-radius: 4px; flex: none; display: inline-block; }
 
+.infolink { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.infolink::after { content: ''; position: absolute; inset: -12px -6px; }          /* Tippfläche mindestens 44 px hoch */
+.infolink .ic { width: 16px; height: 16px; }
+#sheet .kv { margin: var(--s2) 0; } #sheet .kv .hint { font-weight: 400; color: var(--muted); font-size: .8125rem; }
+.warn-card { display: grid; gap: var(--s2); padding-bottom: var(--s2); }
+.warn-card .btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); padding: 0 var(--s1); }
 .bnav { gap: var(--s1); }
 .bnav .m { font-size: 1rem; min-width: 0; overflow-wrap: anywhere; }
 .bnav .btn.small { flex: none; min-width: 64px; }

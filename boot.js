@@ -106,6 +106,16 @@ document.addEventListener('click', (e) => {
       callBank('banks', { query: bankUI.q }).then((r) => { bankUI.busy = ''; if (r.ok) bankUI.banks = r.banks; else bankUI.err = r.message || 'Suche fehlgeschlagen.'; render({ force: true }); }); break; }
     case 'bank-start': { bankUI.busy = 'start'; render({ force: true });
       callBank('start', { bank: k }).then((r) => { if (r.ok && r.url) { location.href = r.url; return; } bankUI.busy = ''; bankUI.err = r.message || 'Verbindung konnte nicht gestartet werden.'; render({ force: true }); }); break; }
+    case 'warn-hide': case 'warn-show': case 'warn-del': {
+      const w = warnings(true).find((x) => x.id === id); if (!w) break;
+      const st = settings(), hid = Object.assign({}, st.warnHidden || {}), del = Object.assign({}, st.warnDeleted || {});
+      if (act === 'warn-hide') hid[id] = w.text; else if (act === 'warn-show') delete hid[id]; else { del[id] = w.text; delete hid[id]; }
+      setSettings({ warnHidden: hid, warnDeleted: del });
+      if (act === 'warn-del') toast('Warnung gelöscht', undefined, { label: 'Wiederherstellen', run: () => { const s2 = settings(), d2 = Object.assign({}, s2.warnDeleted || {}); delete d2[id]; setSettings({ warnDeleted: d2 }); render({ force: true }); } });
+      else announce(act === 'warn-hide' ? 'Warnung ausgeblendet' : 'Warnung eingeblendet');
+      render({ force: true }); break;
+    }
+    case 'budget-info': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; openSheet(budgetSheetHtml(rg, ui.bo[rg]), el); break; }
     case 'bnav': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; ui.bo[rg] = Math.min(0, ui.bo[rg] + Number(k)); render({ force: true }); break; }
     case 'bnow': { const rg = ['tag', 'woche', 'monat'].includes(parseRoute().a) ? parseRoute().a : 'tag'; ui.bo[rg] = 0; render({ force: true }); break; }
     case 'rb': ui.rb = Math.max(1, ui.rb + Number(k)); render({ force: true }); announce(`${dateShort(Fin.review({ txs: derived().txs, cats: derived().cats, fixed: live('fixed'), settings: settings(), today: todayKey() }, ui.rb).from)}`); break;
@@ -184,6 +194,7 @@ function pieSelect(path) {
   path.classList.add('sel'); path.setAttribute('aria-pressed', 'true'); pie.classList.add('has-sel');
   main.textContent = path.dataset.name; sub.textContent = `${path.dataset.amt} · ${path.dataset.pct} %`;
 }
+document.addEventListener('toggle', (e) => { if (e.target.id === 'warn-hidden') ui.warnOpen = e.target.open; }, true);
 document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('slice')) { e.preventDefault(); pieSelect(e.target); } });
 
 /* ---------- Bank-Anbindung (Edge Function bank-sync) ---------- */

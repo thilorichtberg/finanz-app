@@ -314,10 +314,13 @@ function render(opts = {}) {
 }
 const VIEWS = {}, VIEWS_NEU = {}, VIEW_AFTER = {};
 /* Warnungen: Fixkosten über dem Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets, ablaufende Bank-Freigabe */
-function warnings() {
-  const d = derived(), list = Fin.warnings({ txs: d.txs, cats: d.cats, fixed: live('fixed'), settings: settings(), today: todayKey() });
+function warnings(all) {
+  const d = derived(), st = settings(), list = Fin.warnings({ txs: d.txs, cats: d.cats, fixed: live('fixed'), settings: st, today: todayKey() });
   if (typeof bankStatus === 'function') { const b = bankStatus(); if (/warn-text|over-text/.test(b.cls)) list.push({ id: 'bank', kind: 'bank', level: /over/.test(b.cls) ? 'bad' : 'warn', title: 'Bank-Freigabe', text: b.text, href: '#/einstellungen/bank' }); }
-  return list;
+  // Ausgeblendet oder gelöscht gilt nur für genau diesen Stand (gleicher Text); ändert sich die Lage, meldet sich die Warnung wieder
+  const hid = st.warnHidden || {}, del = st.warnDeleted || {};
+  list.forEach((w) => { w.state = del[w.id] === w.text ? 'deleted' : hid[w.id] === w.text ? 'hidden' : 'on'; });
+  return all ? list.filter((w) => w.state !== 'deleted') : list.filter((w) => w.state === 'on');
 }
 function updateDot() {
   const a = $('.tabbar a[data-tab="einstellungen"]'); if (!a) return;

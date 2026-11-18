@@ -20,7 +20,7 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     await page.goto(base + '#/heute'); await page.waitForSelector('.hero');
     const check = async (name) => {
       await page.waitForTimeout(120);
-      const o = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth, small: [...document.querySelectorAll('button,a.btn,a.tx,.chip-filter,.seg a,select,input:not([type=checkbox])')].filter((e) => { const r = e.getBoundingClientRect(); return r.width && r.height && (r.height < 43.5) && !e.closest('[hidden]') && getComputedStyle(e).visibility !== 'hidden'; }).map((e) => (e.getAttribute('aria-label') || e.textContent || e.id).trim().slice(0, 30)) }));
+      const o = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth, small: [...document.querySelectorAll('button,a.btn,a.tx,.chip-filter,.seg a,select,input:not([type=checkbox])')].filter((e) => { const r = e.getBoundingClientRect(); return r.width && r.height && !e.classList.contains('infolink') && (r.height < 43.5) && !e.closest('[hidden]') && getComputedStyle(e).visibility !== 'hidden'; }).map((e) => (e.getAttribute('aria-label') || e.textContent || e.id).trim().slice(0, 30)) }));
       if (o.sw > o.iw) bad(`${tag} ${name}: horizontaler Scroll (${o.sw} > ${o.iw})`);
       if (o.small.length) bad(`${tag} ${name}: Tippfläche < 44 px: ${[...new Set(o.small)].join(', ')}`);
       await page.screenshot({ path: path.join(out, `${tag}-${name}.png`), fullPage: true });
@@ -81,6 +81,20 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     if (!(await page.inputValue('#f-example'))) bad(`${tag} Regel: Beispiel nicht übernommen`);
     if (!(await page.inputValue('#f-text')).trim()) bad(`${tag} Regel: Suchtext nicht vorbelegt`);
     await page.selectOption('#f-cat', 'essen'); await page.click('.gform [type=submit]'); await page.waitForTimeout(250);
+    // Fenster „So setzt sich das Budget zusammen“ für Tag, Woche, Monat
+    for (const rg of ['tag', 'woche', 'monat']) { await nav('#/heute/' + rg, 'budget-' + rg); await page.click('[data-act=budget-info]'); await page.waitForSelector('#sheet[open]'); await check('budget-info-' + rg); await page.keyboard.press('Escape'); await page.waitForTimeout(100); }
+    // Warnungen ausblenden, wieder einblenden, löschen
+    await nav('#/einstellungen/warnungen', 'warn-liste');
+    if (await page.$('[data-act=warn-hide]')) {
+      const n0 = await page.$$eval('.warn-card', (c) => c.length);
+      await page.click('[data-act=warn-hide]'); await page.waitForTimeout(100);
+      if (!(await page.textContent('#warn-hidden summary')).includes('(1)')) bad(`${tag} Ausgeblendet-Zähler zeigt nicht 1`);
+      await page.click('#warn-hidden summary'); await page.waitForTimeout(100); await check('warn-ausgeblendet');
+      await page.click('[data-act=warn-show]'); await page.waitForTimeout(100);
+      if ((await page.$$eval('.warn-card', (c) => c.length)) !== n0) bad(`${tag} Einblenden stellt die Warnung nicht wieder her`);
+      await page.click('[data-act=warn-del]'); await page.waitForTimeout(100);
+      if (await page.$('.warn-card [data-act=warn-hide]')) bad(`${tag} Gelöschte Warnung steht noch in der Liste`);
+    } else bad(`${tag} keine Warnung zum Testen vorhanden`);
     // Alt-Ansicht: Schalter oben in der Mitte, andere Symbole unten
     await page.click('[data-mode=alt]'); await page.waitForTimeout(150);
     for (const r of ['heute/tag', 'umsaetze', 'plan', 'plan/fix', 'einstellungen']) await nav('#/' + r, 'alt-' + r.replace('/', '-'));

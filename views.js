@@ -3,7 +3,7 @@
    Finanzen – Ansichten: Heute, Umsätze, Kategorien, Berichte, Umsatz-Details
    ===================================================================== */
 
-const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1, pq: '', bo: { tag: 0, woche: 0, monat: 0 } };
+const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1, pq: '', warnOpen: false, bo: { tag: 0, woche: 0, monat: 0 } };
 const PIE_COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--pie-other)'];
 const T_UM = () => (uiMode === 'neu' ? 'Übersicht' : 'Umsätze');
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];

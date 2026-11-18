@@ -326,9 +326,11 @@ function setKategorien() {
 }
 
 function setWarnungen() {
-  const list = warnings();
+  const all = warnings(true), on = all.filter((w) => w.state === 'on'), hidden = all.filter((w) => w.state === 'hidden');
+  const card = (w, hiddenCard) => `<div class="warn-card"><a class="tx" href="${w.href}"><span class="cat-ic">${icon('alert')}</span><span class="info"><span class="name">${esc(w.title)}</span><br><span class="meta ${w.level === 'bad' ? 'over-text' : 'warn-text'}">${esc(w.text)}</span></span>${icon('right')}</a>
+    <div class="btn-row"><button type="button" class="btn small" data-act="${hiddenCard ? 'warn-show' : 'warn-hide'}" data-id="${esc(w.id)}">${hiddenCard ? 'Wieder einblenden' : 'Ausblenden'}</button><button type="button" class="btn small ghost" data-act="warn-del" data-id="${esc(w.id)}">Löschen</button></div></div>`;
   return `<div class="view-wrap">${pageHead('Warnungen', { back: '#/einstellungen', backLabel: 'Zurück zu Einstellungen' })}
-    ${list.length ? `<div class="list-block">${list.map((w) => `<a class="tx" href="${w.href}"><span class="cat-ic">${icon('alert')}</span><span class="info"><span class="name">${esc(w.title)}</span><br><span class="meta ${w.level === 'bad' ? 'over-text' : 'warn-text'}">${esc(w.text)}</span></span>${icon('right')}</a>`).join('')}</div>`
-      : emptyBlock('Keine Warnungen', 'Fixkosten, Einkommen, Kategorie-Budgets und die Bank-Freigabe sind in Ordnung.', '')}
-    <p class="hint-line" style="margin-top:var(--s4)">Am Einstellungen-Symbol unten zeigt ein roter Punkt, dass hier etwas wartet.</p></div>`;
+    ${on.length ? `<div class="list-block">${on.map((w) => card(w, false)).join('')}</div>` : emptyBlock('Keine Warnungen', 'Fixkosten, Einkommen, Kategorie-Budgets und die Bank-Freigabe sind in Ordnung.', '')}
+    <details class="fold" id="warn-hidden"${ui.warnOpen ? ' open' : ''}><summary>Ausgeblendet (${hidden.length})${icon('right', 'chev')}</summary><div class="list-block">${hidden.length ? hidden.map((w) => card(w, true)).join('') : '<p class="hint-line" style="padding:0 var(--s2)">Nichts ausgeblendet.</p>'}</div></details>
+    <p class="hint-line" style="margin-top:var(--s4)">Ausgeblendet oder gelöscht gilt nur für den jetzigen Stand. Ändert sich der Betrag oder die Lage, meldet sich die Warnung neu. Am Einstellungen-Symbol unten zeigt ein roter Punkt, dass hier etwas wartet.</p></div>`;
 }

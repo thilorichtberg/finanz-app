@@ -35,7 +35,7 @@ VIEWS_NEU.heute = (r) => {
     : range === 'woche' ? `Noch ${b.daysLeftWeek} ${b.daysLeftWeek === 1 ? 'Tag' : 'Tage'} in dieser Woche` : `${dateShort(b.from)} – ${dateShort(b.to)}, noch ${b.daysLeft} ${b.daysLeft === 1 ? 'Tag' : 'Tage'}`;
   const hero = `<section class="hero" aria-label="Budget"><div class="cap">${esc(CAP)}</div>
     <div class="big ${left < 0 ? 'over' : ''}">${hasPlan ? eur(left) : eur(0)}</div>
-    <div class="sub"><span>${NAME} ${hasPlan ? eur(budgetV) : '–'}</span><span>Ausgegeben ${eur(spent)}</span><span>${esc(slot)}</span></div>
+    <div class="sub"><button type="button" class="infolink" data-act="budget-info" aria-haspopup="dialog">${NAME} ${hasPlan ? eur(budgetV) : '–'}${icon('info')}</button><span>Ausgegeben ${eur(spent)}</span><span>${esc(slot)}</span></div>
     ${meterHtml(spent, hasPlan ? budgetV : 0, st.warnAt)}${state}</section>`;
   const label = range === 'tag' ? (off === 0 ? 'Heute' : off === -1 ? 'Gestern' : fmtD({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(Fin.dparse(V.from)))
     : range === 'woche' ? `${off === 0 ? 'Diese Woche, ' : ''}${dateShort(V.from)} – ${dateShort(V.to)}` : `${dateShort(V.from)} – ${dateShort(V.to)} ${V.to.slice(0, 4)}`;
@@ -71,4 +71,34 @@ function pieHtml(parts) {
   }).join('');
   return `<div class="pie" data-total="${eur(total)}"><svg viewBox="0 0 200 200" role="group" aria-label="Ausgaben nach Kategorie, ein Stück antippen zeigt die Kategorie">${paths}</svg>
     <div class="pie-center" aria-live="polite"><strong class="pc-main">${eur(total)}</strong><span class="pc-sub">Ausgaben</span></div></div>`;
+}
+
+/* ---------- Fenster „So setzt sich das Budget zusammen" (Tippen auf Tageslimit, Wochen- oder Monatsbudget) ---------- */
+function budgetSheetHtml(range, off) {
+  const d = derived(), st = settings(), t = todayKey();
+  const V = Fin.rangeView({ txs: d.txs, cats: d.cats, fixed: live('fixed'), planned: d.planned, settings: st, today: t }, range, off), b = V.b, past = !V.current;
+  const NAME = { tag: 'Tageslimit', woche: 'Wochenbudget', monat: 'Monatsbudget' }[range];
+  const row = (k, v, total) => `<div class="${total ? 'total' : ''}"><dt class="${total ? 'k' : ''}">${k}</dt><dd>${v}</dd></div>`;
+  const items = live('fixed').filter((f) => f.active !== false);
+  const base = [row('Einnahmen (Plan)', eur(b.income)), row('− Fixkosten', eur(b.fixed)), row('− Geplante Zahlungen', eur(b.planned)), row('− Sparrate', eur(b.savings)), row(`Verfügbar im Budgetmonat <span class="hint">(${dateShort(b.from)} – ${dateShort(b.to)})</span>`, eur(b.disposable), true)];
+  let rest = [], note = '';
+  if (range === 'tag') {
+    const before = Fin.round2(b.month.spent - b.day.spent);
+    rest = [row('− Bis dahin ausgegeben', eur(before)), row('= Noch verfügbar', eur(Fin.round2(b.disposable - before))), row(`÷ Tage bis Monatsende (mit diesem Tag)`, String(b.daysLeft)), row(NAME, eur(V.limit), true)];
+    note = 'Gibst du an einem Tag mehr aus als das Limit, sinkt das Limit der restlichen Tage.';
+  } else if (range === 'woche') {
+    const days = Math.round((Fin.dparse(V.to) - Fin.dparse(V.from)) / 864e5) + 1;
+    if (past) rest = [row(`Tageslimit am ${dateShort(V.from)}`, eur(b.day.limit)), row('× Tage der Woche', String(days)), row(NAME, eur(V.limit), true)];
+    else { const wb = Fin.round2(b.week.spent - b.day.spent); rest = [row('Tageslimit heute', eur(b.day.limit)), row('× Tage bis Wochenende', String(b.daysLeftWeek)), row('+ Diese Woche vor heute ausgegeben', eur(wb)), row(NAME, eur(V.limit), true)]; }
+    note = 'Die Woche ist der Teil, der in deinen Budgetmonat fällt.';
+  } else {
+    rest = [row('− Ausgegeben im Budgetmonat', eur(V.spent)), row('= Übrig', eur(V.left), true)];
+  }
+  const group = (title, list, fmt) => (list.length ? `<h3 style="margin-top:var(--s3)">${title}</h3><dl class="kv">${list.map(fmt).join('')}</dl>` : '');
+  const inc = items.filter((f) => f.kind === 'income'), fx = items.filter((f) => f.kind !== 'income');
+  const pl = d.planned.filter((p) => !p.done && !p.matched && p.due <= b.to && (!past || p.due >= b.from));
+  return `<div class="sheet-head"><h2 id="sheet-title">So setzt sich das ${NAME} zusammen</h2><button type="button" class="icon-btn" data-sheet-close aria-label="Schließen">${icon('x')}</button></div>
+    <dl class="kv">${base.join('')}${rest.join('')}</dl>${note ? `<p class="sheet-note">${esc(note)}</p>` : ''}
+    ${group('Einnahmen', inc, (f) => row(esc(f.name), eur(Math.abs(f.amount))))}${group('Fixkosten', fx, (f) => row(esc(f.name), eur(Math.abs(f.amount))))}${group('Geplante Zahlungen', pl, (p) => row(`${esc(p.name)} <span class="hint">${dateShort(p.due)}</span>`, eur(Math.abs(p.amount))))}
+    <p class="sheet-note">Buchungen, die zu einem Fixposten passen, zählen nicht als Ausgabe.</p>`;
 }
