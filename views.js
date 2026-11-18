@@ -3,12 +3,13 @@
    Finanzen – Ansichten: Heute, Umsätze, Kategorien, Berichte, Umsatz-Details
    ===================================================================== */
 
-const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1, pq: '', warnOpen: false, bo: { tag: 0, woche: 0, monat: 0 } };
+const ui = { month: todayKey().slice(0, 7), filter: 'alle', q: '', limit: 60, acct: '', rb: 1, pq: '', warnOpen: false, filterOpen: false, fixMore: false, bo: { tag: 0, woche: 0, monat: 0 } };
 const PIE_COLORS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--pie-other)'];
 // Ist der Zeitraum ein ganzer Kalendermonat, heißt er wie der Monat; sonst Datum bis Datum
 const isCalMonth = (from, to) => { const a = Fin.dparse(from), z = Fin.dparse(to); return a.getDate() === 1 && a.getMonth() === z.getMonth() && a.getFullYear() === z.getFullYear() && z.getDate() === Fin.daysInMonth(z.getFullYear(), z.getMonth()); };
 const periodShort = (from, to) => (isCalMonth(from, to) ? MONTHS[Number(from.slice(5, 7)) - 1] : `${dateShort(from)} – ${dateShort(to)}`);
 const periodLabel = (from, to) => (isCalMonth(from, to) ? monthLabel(from.slice(0, 7)) : `${dateShort(from)} – ${dateShort(to)} ${to.slice(0, 4)}`);
+const catIc = (c) => `<span class="cat-ic" style="--cc:${catColor(c.id)}">${icon(c.icon)}</span>`;
 const T_UM = () => (uiMode === 'neu' ? 'Übersicht' : 'Umsätze');
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const MON_S = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -36,7 +37,7 @@ function seg(items, cur, label) {
 function txRow(t, opt = {}) {
   const c = derived().cmap.get(t.cat) || catById(t.cat);
   const meta = [c.name, opt.showDate ? dateShort(t.date) : '', t.fixedId ? 'Fixkosten, zählt nicht als Ausgabe' : ''].filter(Boolean).join(' · ');
-  return `<a class="tx" href="#/tx/${encodeURIComponent(t.id)}" data-fid="tx-${esc(t.id)}"><span class="cat-ic">${icon(c.icon)}</span>
+  return `<a class="tx" href="#/tx/${encodeURIComponent(t.id)}" data-fid="tx-${esc(t.id)}">${catIc(c)}
     <span class="info"><span class="name">${esc(t.title)}</span><br><span class="meta">${esc(meta)}</span></span>${amt(t.amount, c.kind === 'transfer' || t.fixedId ? 'muted' : '')}</a>`;
 }
 function emptyBlock(title, text, btn) {
@@ -140,12 +141,14 @@ VIEWS.umsaetze = (r) => {
   if (sub === 'kategorien') return umKategorien();
   if (sub === 'berichte') return umBerichte();
   const accts = live('acct');
-  const chips = [['alle', 'Alle'], ['ausgaben', 'Ausgaben'], ['einnahmen', 'Einnahmen'], ['sonstiges', 'Sonstiges']];
+  const chips = [['alle', 'Alle'], ['ausgaben', 'Ausgaben'], ['einnahmen', 'Einnahmen'], ['sonstiges', 'Sonstiges']], nFilt = (ui.filter !== 'alle' ? 1 : 0) + (ui.acct ? 1 : 0);
   return `<div class="view-wrap">${pageHead(T_UM(), { actions: `<button type="button" class="icon-btn" data-act="import-csv" aria-label="CSV importieren">${icon('upload')}</button>` })}
     ${UM_SEG('liste')}
-    <div class="todo-bar"><label class="search"><span class="sr">Umsätze durchsuchen</span>${icon('search')}<input type="search" id="q" data-fid="q" value="${esc(ui.q)}" placeholder="Suchen" autocomplete="off" enterkeyhint="search"></label></div>
-    <div class="filters" role="group" aria-label="Filter">${chips.map(([id, l]) => `<button type="button" class="chip-filter" data-act="filter" data-k="${id}" aria-pressed="${ui.filter === id}">${l}</button>`).join('')}</div>
-    ${accts.length > 1 ? `<div class="field" style="margin-bottom:var(--s3)"><label for="acct-f">Konto</label><select id="acct-f" data-fid="acct-f"><option value="">Alle Konten</option>${accts.map((a) => `<option value="${esc(a.id)}"${ui.acct === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>` : ''}
+    <div class="todo-bar"><label class="search"><span class="sr">Umsätze durchsuchen</span>${icon('search')}<input type="search" id="q" data-fid="q" value="${esc(ui.q)}" placeholder="Suchen" autocomplete="off" enterkeyhint="search"></label>
+      <button type="button" class="icon-btn filter-btn" data-act="filter-toggle" aria-expanded="${ui.filterOpen}" aria-controls="filters-panel" aria-label="Filter${nFilt ? `, ${nFilt} aktiv` : ''}">${icon('filter')}${nFilt ? `<span class="count" aria-hidden="true">${nFilt}</span>` : ''}</button></div>
+    <div id="filters-panel"${ui.filterOpen ? '' : ' hidden'}>
+      <div class="filters" role="group" aria-label="Filter">${chips.map(([id, l]) => `<button type="button" class="chip-filter" data-act="filter" data-k="${id}" aria-pressed="${ui.filter === id}">${l}</button>`).join('')}</div>
+      ${accts.length > 1 ? `<div class="field"><label for="acct-f">Konto</label><select id="acct-f" data-fid="acct-f"><option value="">Alle Konten</option>${accts.map((a) => `<option value="${esc(a.id)}"${ui.acct === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>` : ''}</div>
     <div id="txlist" data-live>${txListHtml()}</div></div>`;
 };
 
@@ -154,19 +157,19 @@ function catRowHtml(c, sum, total, warnAt, color) {
   const hasB = c.budget > 0, p = hasB ? pct(sum, c.budget) : pct(sum, total);
   const sub = hasB ? `${eur(sum)} von ${eur(c.budget)}${p >= 100 ? ' – überschritten' : p >= warnAt ? ' – bald aufgebraucht' : ''}` : `${p} % der Ausgaben`;
   const cls = hasB ? (p >= 100 ? 'bad' : p >= warnAt ? 'warn' : '') : '';
-  return `<a class="catrow" href="#/kategorie/${c.id}"><span class="top">${color ? `<i class="sw" style="background:${color}"></i>` : ''}<span class="cat-ic">${icon(c.icon)}</span><span class="nm">${esc(c.name)}</span><span class="amt">${eur(sum)}</span></span>
+  return `<a class="catrow" href="#/kategorie/${c.id}"><span class="top">${catIc(c)}<span class="nm">${esc(c.name)}</span><span class="amt">${eur(sum)}</span></span>
     <span class="meter ${cls}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, p)}" aria-label="${esc(sub)}"><i style="transform:scaleX(${Math.min(1, p / 100)})"></i></span><span class="sub"><span class="${cls === 'bad' ? 'over-text' : cls === 'warn' ? 'warn-text' : ''}">${esc(sub)}</span></span></a>`;
 }
 function umKategorien() {
   const d = derived(), [a, z] = monthRange(ui.month), st = settings();
   const sums = Fin.byCategory(d.txs, d.cats, a, z), total = sums.reduce((s, x) => s + x.total, 0);
   const have = new Set(sums.map((s) => s.id));
-  const pieParts = sums.slice(0, 6).map((x, i) => ({ name: catById(x.id).name, total: x.total, color: PIE_COLORS[i] }));
-  if (sums.length > 6) pieParts.push({ name: 'Weitere', total: sums.slice(6).reduce((q, x) => q + x.total, 0), color: PIE_COLORS[6] });
+  const pieParts = sums.slice(0, 8).map((x) => ({ name: catById(x.id).name, total: x.total, color: catColor(x.id) }));
+  if (sums.length > 8) pieParts.push({ name: 'Weitere', total: sums.slice(8).reduce((q, x) => q + x.total, 0), color: 'var(--pie-other)' });
   const withBudget = d.cats.filter((c) => c.budget > 0 && !have.has(c.id));
   return `<div class="view-wrap">${pageHead(T_UM())}${UM_SEG('kategorien')}${monthNav(ui.month)}
     <dl class="kv" style="margin-bottom:var(--s4)"><div class="total"><dt class="k">Ausgaben im ${esc(MONTHS[Number(ui.month.slice(5)) - 1])}</dt><dd>${eur(total)}</dd></div></dl>
-    ${uiMode === 'neu' ? pieHtml(pieParts) : ''}${sums.length || withBudget.length ? `<div class="list-block">${sums.map((s, i) => catRowHtml(catById(s.id), s.total, total, st.warnAt, uiMode === 'neu' ? PIE_COLORS[Math.min(i, 6)] : '')).join('')}${withBudget.map((c) => catRowHtml(c, 0, total, st.warnAt)).join('')}</div>`
+    ${uiMode === 'neu' ? pieHtml(pieParts) : ''}${sums.length || withBudget.length ? `<div class="list-block">${sums.map((s, i) => catRowHtml(catById(s.id), s.total, total, st.warnAt)).join('')}${withBudget.map((c) => catRowHtml(c, 0, total, st.warnAt)).join('')}</div>`
       : emptyBlock('Keine Ausgaben', 'In diesem Monat gibt es keine Umsätze.', '')}
     <p class="hint-line" style="margin-top:var(--s3)">Umbuchungen zählen nicht mit. Ein Budget pro Kategorie stellst du unter Einstellungen → Kategorien ein.</p></div>`;
 }
@@ -297,7 +300,7 @@ VIEWS.rueckblick = () => {
   if (!r.hasData) return `<div class="view-wrap">${head}${nav}${emptyBlock('Keine Umsätze', 'In diesem Budgetmonat gibt es keine Umsätze. Blättere weiter zurück.', '')}</div>`;
   const hasB = r.disposable > 0, state = !hasB ? `<span class="state">${icon('info')}Kein Budget geplant</span>` : r.kept ? `<span class="state ok">${icon('check')}Budget gehalten</span>` : `<span class="state bad">${icon('alert')}Budget um ${eur(-r.left)} überschritten</span>`;
   const dExp = r.expense - r.prevExpense;
-  const top = r.top.map((x) => { const c = d.cmap.get(x.id) || catById(x.id), dv = x.total - x.prev; return `<a class="catrow" href="#/kategorie/${esc(x.id)}"><span class="top"><span class="cat-ic">${icon(c.icon)}</span><span class="nm">${esc(c.name)}</span><span class="amt">${eur(x.total)}</span></span>
+  const top = r.top.map((x) => { const c = d.cmap.get(x.id) || catById(x.id), dv = x.total - x.prev; return `<a class="catrow" href="#/kategorie/${esc(x.id)}"><span class="top">${catIc(c)}<span class="nm">${esc(c.name)}</span><span class="amt">${eur(x.total)}</span></span>
     <span class="sub"><span>${x.share} % der Ausgaben</span><span>${x.prev ? (dv === 0 ? 'wie davor' : (dv > 0 ? '+' : '−') + eur(Math.abs(dv)) + ' zum Zeitraum davor') : 'davor nichts'}</span></span></a>`; }).join('');
   return `<div class="view-wrap">${head}${nav}
     <section class="hero"><div class="cap">${hasB ? (r.left >= 0 ? 'Übrig geblieben' : 'Überschritten') : 'Variabel ausgegeben'}</div><div class="big ${hasB && r.left < 0 ? 'over' : ''}">${eur(hasB ? r.left : r.spent)}</div>
@@ -320,7 +323,7 @@ function pickListHtml() {
     return !q || Fin.fold(`${t.title} ${t.name} ${t.purpose} ${t.amount}`).includes(q);
   }).slice(0, 60);
   if (!list.length) return `<div class="empty compact"><h2>Nichts gefunden</h2><p>${derived().txs.length ? 'Ändere den Suchbegriff.' : 'Importiere zuerst Umsätze oder verbinde die Bank.'}</p></div>`;
-  return `<div class="list-block">${list.map((t) => `<button type="button" class="tx" data-act="pick-example" data-id="${esc(t.id)}"><span class="cat-ic">${icon((cmap.get(t.cat) || {}).icon || 'dots')}</span><span class="info"><span class="name">${esc(t.title)}</span><br><span class="meta">${esc(dateShort(t.date))} · ${esc((cmap.get(t.cat) || {}).name || '')}</span></span>${amt(t.amount)}</button>`).join('')}</div>`;
+  return `<div class="list-block">${list.map((t) => `<button type="button" class="tx" data-act="pick-example" data-id="${esc(t.id)}">${catIc(cmap.get(t.cat) || { id: t.cat, icon: 'dots' })}<span class="info"><span class="name">${esc(t.title)}</span><br><span class="meta">${esc(dateShort(t.date))} · ${esc((cmap.get(t.cat) || {}).name || '')}</span></span>${amt(t.amount)}</button>`).join('')}</div>`;
 }
 VIEWS.beispiel = (r) => {
   const income = r.a === 'einkommen', back = `#/neu/${r.a === 'einkommen' ? 'einkommen' : r.a === 'regel' ? 'regel' : 'fix'}${r.b && r.b !== 'neu' ? '/' + encodeURIComponent(r.b) : ''}`;

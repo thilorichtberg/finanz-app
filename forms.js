@@ -150,7 +150,7 @@ const FORM_DEFS = {
       save: (v) => {
         if (c && c.builtin) put('cat', Object.assign({}, S.cat[c.id] || {}, { id: c.id, budget: v.budget === '' ? 0 : v.budget }));
         else put('cat', Object.assign(c ? S.cat[c.id] : { id: uid('ca') }, { custom: true, name: v.name, kind: v.kind, icon: 'tag', budget: v.budget === '' ? 0 : v.budget || 0 }));
-        return { to: c ? `#/kategorie/${c.id}` : '#/einstellungen/kategorien', msg: 'Kategorie gespeichert' }; } }; },
+        ensureCatColors(); return { to: c ? `#/kategorie/${c.id}` : '#/einstellungen/kategorien', msg: 'Kategorie gespeichert' }; } }; },
   konto: (id) => { const it = id ? get('acct', id) : null; if (id && !it) return null;
     return { title: it ? 'Konto' : 'Konto anlegen', back: '#/einstellungen/konten', values: it ? { name: it.name, kind: it.kind || 'giro', iban: it.iban || '' } : { kind: 'giro' }, intro: 'Die IBAN erkennt Überweisungen zwischen deinen eigenen Konten, damit sie nicht als Ausgabe zählen.',
       fields: [{ n: 'name', t: 'text', l: 'Name', max: 40 }, { n: 'kind', t: 'select', l: 'Art', o: [['giro', 'Girokonto'], ['tages', 'Tagesgeld'], ['kredit', 'Kreditkarte']] }, { n: 'iban', t: 'text', l: 'IBAN', opt: true, max: 40 }],
@@ -240,7 +240,7 @@ function planFix() {
     <p class="hint-line" style="margin-top:var(--s2)">Der feste Betrag wird jeden Budgetmonat abgezogen. Buchungen, die zu einem Posten passen, zählen nicht als Ausgabe.</p>
     ${diffs}
     <section class="section"><h2>Einnahmen <span class="amt in">${eur(sum(inc))}</span></h2>${inc.length ? `<div class="list-block">${inc.map(incRow).join('')}</div><a class="btn" href="#/neu/einkommen">Weiteres Einkommen eintragen</a>` : '<p class="hint-line">Noch kein regelmäßiges Einkommen. Ohne Einkommen kann ich kein Tageslimit berechnen.</p><a class="btn primary" href="#/neu/einkommen">Einkommen eintragen</a>'}</section>
-    <section class="section"><h2>Fixkosten <span class="amt">${eur(-sum(exp))}</span></h2>${exp.length ? `<div class="list-block">${exp.map(expRow).join('')}</div>` : '<p class="hint-line">Miete, Strom, Handy, Abos: alles, was jeden Monat gleich abgebucht wird. Trag es selbst ein.</p>'}<a class="btn" href="#/neu/fix">${exp.length ? 'Weitere Fixkosten' : 'Fixkosten anlegen'}</a></section></div>`;
+    <section class="section"><h2>Fixkosten <span class="amt">${eur(-sum(exp))}</span></h2>${exp.length ? `<div class="list-block">${(ui.fixMore ? exp : exp.slice(0, 3)).map(expRow).join('')}</div>${exp.length > 3 ? `<button type="button" class="btn small" data-act="fix-more" aria-expanded="${ui.fixMore}">${ui.fixMore ? 'Weniger anzeigen' : `Mehr anzeigen (${exp.length - 3})`}</button>` : ''}` : '<p class="hint-line">Miete, Strom, Handy, Abos: alles, was jeden Monat gleich abgebucht wird. Trag es selbst ein.</p>'}<a class="btn" href="#/neu/fix">${exp.length ? 'Weitere Fixkosten eintragen' : 'Fixkosten eintragen'}</a></section></div>`;
 }
 function planZiele() {
   const goals = live('goal');
@@ -330,7 +330,7 @@ function setRegeln() {
 function setKategorien() {
   const d = derived();
   return `<div class="view-wrap">${pageHead('Kategorien', { back: '#/einstellungen', actions: `<a class="icon-btn add" href="#/neu/kategorie" aria-label="Kategorie anlegen">${icon('plus')}</a>` })}
-    <div class="list-block">${d.cats.map((c) => `<a class="tx" href="#/neu/kategorie/${esc(c.id)}"><span class="cat-ic">${icon(c.icon)}</span><span class="info"><span class="name">${esc(c.name)}</span><br><span class="meta">${c.kind === 'income' ? 'Einnahme' : c.kind === 'transfer' ? 'Zählt nicht' : c.kind === 'refund' ? 'Mindert Ausgaben' : 'Ausgabe'}${c.builtin ? '' : ' · eigene'}</span></span>${c.budget > 0 ? `<span class="amt">${eur(c.budget)}</span>` : icon('right')}</a>`).join('')}</div></div>`;
+    <div class="list-block">${d.cats.map((c) => `<a class="tx" href="#/neu/kategorie/${esc(c.id)}">${catIc(c)}<span class="info"><span class="name">${esc(c.name)}</span><br><span class="meta">${c.kind === 'income' ? 'Einnahme' : c.kind === 'transfer' ? 'Zählt nicht' : c.kind === 'refund' ? 'Mindert Ausgaben' : 'Ausgabe'}${c.builtin ? '' : ' · eigene'}</span></span>${c.budget > 0 ? `<span class="amt">${eur(c.budget)}</span>` : icon('right')}</a>`).join('')}</div></div>`;
 }
 
 function setWarnungen() {

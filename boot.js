@@ -88,13 +88,15 @@ document.addEventListener('click', (e) => {
   const back = e.target.closest('.page-head .back');          // Zurück-Pfeil: zur Seite davor, die feste Adresse gilt nur als Ersatz
   if (back && navStack.length > 1) { e.preventDefault(); history.back(); return; }
   const sl = e.target.closest('.pie .slice');                 // Torte: Antippen zeigt den Namen der Kategorie
-  if (sl) { pieSelect(sl); return; }
+  if (sl) { pieSelect(sl); if (e.detail > 0) sl.blur(); return; }
   if (e.target.closest('.pie svg')) { const sel = e.target.closest('.pie').querySelector('.slice.sel'); if (sel) pieSelect(sel); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id, k = el.dataset.k;
   switch (act) {
     case 'month': ui.month = shiftMonth(ui.month, Number(k)); render({ force: true }); announce(monthLabel(ui.month)); break;
     case 'filter': ui.filter = k; ui.limit = 60; render({ force: true }); break;
+    case 'filter-toggle': { ui.filterOpen = !ui.filterOpen; const panel = $('#filters-panel'); if (panel) panel.hidden = !ui.filterOpen; el.setAttribute('aria-expanded', String(ui.filterOpen)); break; }
+    case 'fix-more': ui.fixMore = !ui.fixMore; render({ force: true }); break;
     case 'clear-filter': ui.filter = 'alle'; ui.q = ''; ui.acct = ''; ui.limit = 60; render({ force: true }); break;
     case 'more': ui.limit += 60; $('#txlist').innerHTML = txListHtml(); break;
     case 'import-csv': $('#csv-file').click(); break;
@@ -255,6 +257,7 @@ async function checkForUpdate() {
 }
 
 /* ---------- Start ---------- */
+ensureCatColors();
 if (!settings().periodV2) {                                  // einmalig: Budgetmonate sind wieder ganze Kalendermonate (1. bis Monatsende)
   setSettings({ periodStart: 1, periodV2: true });
 }
