@@ -212,7 +212,7 @@ VIEWS.einstellungen = (r) => {
   const st = settings(), d = derived();
   return `<div class="view-wrap">${pageHead('Einstellungen')}<div class="list-block">
     ${ST('#/einstellungen/konto', 'user', 'Konto & Cloud', cloud.user ? 'Angemeldet, Abgleich ' + (cloud.state === 'ok' ? 'aktuell' : cloud.state === 'error' ? 'fehlgeschlagen' : cloud.state === 'busy' ? 'läuft …' : 'bereit') : sb ? 'Nicht angemeldet, Daten nur auf diesem Gerät' : 'Cloud nicht verfügbar')}
-    ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', 'CSV importieren, Bank verbinden', bankUI.state === 'ready' ? '' : '<span class="badge">Bank bald</span>')}
+    ${ST('#/einstellungen/bank', 'landmark', 'Bank & Import', bankUI.state === 'ready' ? (bankUI.links.some((l) => l.status === 'active') ? 'Bank verbunden, CSV importieren' : 'Bank verbinden, CSV importieren') : 'CSV importieren, Bank verbinden', bankUI.state === 'login' ? '<span class="badge warn">Anmelden</span>' : bankUI.state === 'off' ? '<span class="badge">Bank bald</span>' : '')}
     ${ST('#/einstellungen/konten', 'wallet', 'Konten', `${live('acct').length} ${live('acct').length === 1 ? 'Konto' : 'Konten'}`)}
     ${ST('#/einstellungen/budget', 'target', 'Budget & Sparrate', `Sparrate ${eur(st.savingsTarget)} · Warnung ab ${st.warnAt} %`)}
     ${ST('#/einstellungen/kategorien', 'layers', 'Kategorien', `${d.cats.length} Kategorien, Budgets pro Kategorie`)}
@@ -257,7 +257,7 @@ function setBank() {
       ${bankUI.banks ? (bankUI.banks.length ? `<div class="list-block">${bankUI.banks.map((b) => `<button type="button" class="tx" data-act="bank-start" data-k="${esc(b.name)}"${bankUI.busy ? ' disabled' : ''}><span class="cat-ic">${icon('landmark')}</span><span class="info"><span class="name">${esc(b.name)}</span><br><span class="meta">Bei der Bank freigeben</span></span>${icon('right')}</button>`).join('')}</div>` : '<p class="hint-line">Keine Bank gefunden. Probier einen kürzeren Suchbegriff.</p>') : ''}`;
   else direct = `<p class="hint-line">Status wird geladen …</p>`;
   return `<div class="view-wrap">${pageHead('Bank & Import', { back: '#/einstellungen' })}
-    <section class="section" style="margin-top:0"><h2>Bank direkt verbinden${st === 'ready' ? '' : ' <span class="badge">Bald</span>'}</h2><div class="panel">${direct}${bankUI.err ? `<p class="error" role="alert">${esc(bankUI.err)}</p>` : ''}
+    <section class="section" style="margin-top:0"><h2>Bank direkt verbinden${st === 'off' ? ' <span class="badge">Bald</span>' : ''}</h2><div class="panel">${direct}${bankUI.err ? `<p class="error" role="alert">${esc(bankUI.err)}</p>` : ''}
       ${st === 'ready' ? '<p class="hint-line">Die Bank fragt dich nach der Freigabe. Sie gilt nur für Kontoinformationen (lesen), nie zum Bezahlen, und läuft nach einigen Wochen ab. Dann bestätigst du sie einfach erneut.</p>' : ''}</div></section>
     <section class="section"><h2>CSV importieren</h2><div class="panel"><p>Lade im Online-Banking den Umsatz-Export als CSV herunter (bei der Volksbank: Umsätze → Export → CSV) und wähle die Datei hier aus. Doppelte Umsätze werden erkannt und übersprungen, du kannst jederzeit neu importieren.</p><button type="button" class="btn" data-act="import-csv">${icon('upload')}CSV auswählen</button></div>
       ${lines ? `<dl class="kv" style="margin-top:var(--s3)">${lines}</dl>` : ''}</section></div>`;

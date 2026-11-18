@@ -184,8 +184,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { da
 window.addEventListener('online', () => runSync(true));
 
 if (sb) {
-  sb.auth.getSession().then(({ data }) => { adoptUser(data && data.session ? data.session.user : null); if (cloud.user) runSync(true); render(); });
-  sb.auth.onAuthStateChange((ev, session) => { const was = !!cloud.user; adoptUser(session ? session.user : null); if (cloud.user && !was) runSync(true); });
+  sb.auth.getSession().then(({ data }) => { adoptUser(data && data.session ? data.session.user : null); if (cloud.user) { runSync(true); loadBank(); } else { bankUI.state = 'login'; } render(); });
+  sb.auth.onAuthStateChange((ev, session) => { const was = !!cloud.user; adoptUser(session ? session.user : null); if (cloud.user && !was) { runSync(true); bankUI.loaded = false; loadBank(); } });
 }
 render({ force: true });
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
