@@ -61,12 +61,12 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     if (!(await page.isHidden('#filter-menu'))) bad(`${tag} Filter-Menü ist offen, obwohl es zu sein sollte`);
     await page.click('[data-act=filter-toggle]'); await page.waitForTimeout(120); await check('verlauf-filter-menue');
     if (await page.isHidden('#filter-menu')) bad(`${tag} Filter-Knopf öffnet das Menü nicht`);
-    await page.click('[data-act=filter][data-k=ausgaben]'); await page.waitForTimeout(120);
+    await page.click('[data-act=filter][data-k=ausgaben]'); await page.waitForTimeout(400);
     if (!(await page.isHidden('#filter-menu'))) bad(`${tag} Menü schließt sich nach der Auswahl nicht`);
     if (!(await page.textContent('.filter-btn .count')).trim()) bad(`${tag} Filter-Zähler fehlt`);
-    await page.click('[data-act=filter-toggle]'); await page.keyboard.press('Escape'); await page.waitForTimeout(80);
+    await page.click('[data-act=filter-toggle]'); await page.keyboard.press('Escape'); await page.waitForTimeout(400);
     if (!(await page.isHidden('#filter-menu'))) bad(`${tag} Escape schließt das Menü nicht`);
-    await page.click('[data-act=filter-toggle]'); await page.click('[data-act=filter][data-k=alle]'); await page.waitForTimeout(80);
+    await page.click('[data-act=filter-toggle]'); await page.click('[data-act=filter][data-k=alle]'); await page.waitForTimeout(400);
     for (const nm of ['Fix A', 'Fix B', 'Fix C', 'Fix D']) { await nav('#/neu/fix', 'form-fix-x'); await page.fill('#f-name', nm); await page.fill('#f-amount', '10'); await page.fill('#f-day', '5'); await page.click('.gform [type=submit]'); await page.waitForTimeout(150); }
     await nav('#/plan', 'plan-fix-mehr');
     if ((await page.$$eval('.list-block .tx', (e) => e.length)) < 1) bad(`${tag} Plan zeigt keine Fixkosten`);

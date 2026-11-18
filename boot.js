@@ -84,8 +84,21 @@ function armDelete(btn, run) {
 }
 
 /* ---------- Klicks ---------- */
+// Filter anwenden ohne die Seite neu zu zeichnen: Liste, Haken und Zähler aktualisieren, das Menü blendet danach aus
+function applyFilter() {
+  ui.limit = 60; $('#txlist').innerHTML = txListHtml();
+  const m = $('#filter-menu'), b = $('.filter-btn');
+  if (m) m.innerHTML = filterMenuInner();
+  if (b) { b.innerHTML = filterBtnInner(); const n = filterCount(); b.setAttribute('aria-label', `Filter${n ? `, ${n} aktiv` : ''}`); }
+  closeFilterMenu(true);
+}
 function closeFilterMenu(focusBtn) {
-  ui.filterOpen = false; const m = $('#filter-menu'), b = $('.filter-btn'); if (m) m.hidden = true; if (b) { b.setAttribute('aria-expanded', 'false'); if (focusBtn) b.focus(); }
+  ui.filterOpen = false; const m = $('#filter-menu'), b = $('.filter-btn');
+  if (b) { b.setAttribute('aria-expanded', 'false'); if (focusBtn) b.focus({ preventScroll: true }); }
+  if (!m || m.hidden) return;
+  if (noMotion()) { m.hidden = true; return; }
+  m.classList.add('closing');                                // ausblenden, dann erst verstecken
+  m.addEventListener('animationend', () => { m.hidden = true; m.classList.remove('closing'); }, { once: true });
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.filterOpen) { e.preventDefault(); closeFilterMenu(true); } });
 document.addEventListener('click', (e) => {
@@ -99,9 +112,14 @@ document.addEventListener('click', (e) => {
   const act = el.dataset.act, id = el.dataset.id, k = el.dataset.k;
   switch (act) {
     case 'month': ui.month = shiftMonth(ui.month, Number(k)); render({ force: true }); announce(monthLabel(ui.month)); break;
-    case 'filter': ui.filter = k; ui.limit = 60; ui.filterOpen = false; render({ force: true }); break;
-    case 'filter-toggle': { ui.filterOpen = !ui.filterOpen; const m = $('#filter-menu'); if (m) m.hidden = !ui.filterOpen; el.setAttribute('aria-expanded', String(ui.filterOpen)); if (ui.filterOpen && m) { const f = m.querySelector('[aria-checked="true"]') || m.querySelector('.menu-item'); if (f) f.focus(); } break; }
-    case 'acct': ui.acct = k; ui.limit = 60; ui.filterOpen = false; render({ force: true }); break;
+    case 'filter': ui.filter = k; applyFilter(); break;
+    case 'filter-toggle': {
+      const m = $('#filter-menu'); if (!m) break;
+      if (ui.filterOpen) { closeFilterMenu(false); break; }
+      ui.filterOpen = true; m.classList.remove('closing'); m.hidden = false; el.setAttribute('aria-expanded', 'true');
+      const f = m.querySelector('[aria-checked="true"]') || m.querySelector('.menu-item'); if (f) f.focus({ preventScroll: true }); break;
+    }
+    case 'acct': ui.acct = k; applyFilter(); break;
     case 'fix-more': {
       ui.fixMore = !ui.fixMore; const pk = $('#fix-peek'); if (!pk) { render({ force: true }); break; }
       const list = pk.querySelector('.list-block'), label = el.querySelector('span');

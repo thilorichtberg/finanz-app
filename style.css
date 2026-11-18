@@ -507,7 +507,9 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 .menu-item:active { background: var(--surface-2); }
 .menu-item[aria-checked="true"] { color: var(--accent); }
 .menu-item .ic { width: 18px; height: 18px; flex: none; }
-@media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
+@keyframes menu-out { to { opacity: 0; transform: translateY(-4px); } }
+.menu.closing { animation: menu-out 120ms var(--ease) forwards; pointer-events: none; }          /* schließen etwas schneller als öffnen */
+@media (prefers-reduced-motion: reduce) { .menu, .menu.closing { animation: none; } }
 /* „Mehr anzeigen“: Textknopf (nicht wie ein Knopf zum Eintragen) und die nächste Karte schaut angeschnitten mit Verlauf hervor */
 .peek { position: relative; overflow: hidden; max-height: 46px; margin-top: calc(-1 * var(--s1)); transition: max-height var(--t-med) var(--ease); }
 .peek-fade { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 0%, var(--bg) 95%); pointer-events: none; opacity: 1; transition: opacity var(--t-med) var(--ease); }

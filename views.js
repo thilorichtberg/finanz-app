@@ -135,6 +135,14 @@ function txListHtml() {
   if (all.length > list.length) html += `<button type="button" class="btn block more" data-act="more">Mehr anzeigen (${all.length - list.length})</button>`;
   return html;
 }
+const FILTER_CHIPS = [['alle', 'Alle'], ['ausgaben', 'Ausgaben'], ['einnahmen', 'Einnahmen'], ['sonstiges', 'Sonstiges']];
+const filterCount = () => (ui.filter !== 'alle' ? 1 : 0) + (ui.acct ? 1 : 0);
+function filterBtnInner() { const n = filterCount(); return `${icon('filter')}${n ? `<span class="count" aria-hidden="true">${n}</span>` : ''}`; }
+function filterMenuInner() {
+  const accts = live('acct'), chips = FILTER_CHIPS;
+  return `<div class="menu-group" role="group" aria-label="Art"><span class="menu-label">Art</span>${chips.map(([id, l]) => `<button type="button" class="menu-item" role="menuitemradio" aria-checked="${ui.filter === id}" data-act="filter" data-k="${id}"><span>${l}</span>${ui.filter === id ? icon('check') : ''}</button>`).join('')}</div>
+${accts.length > 1 ? `<div class="menu-group" role="group" aria-label="Konto"><span class="menu-label">Konto</span><button type="button" class="menu-item" role="menuitemradio" aria-checked="${!ui.acct}" data-act="acct" data-k=""><span>Alle Konten</span>${!ui.acct ? icon('check') : ''}</button>${accts.map((a) => `<button type="button" class="menu-item" role="menuitemradio" aria-checked="${ui.acct === a.id}" data-act="acct" data-k="${esc(a.id)}"><span>${esc(a.name)}</span>${ui.acct === a.id ? icon('check') : ''}</button>`).join('')}</div>` : ''}`;
+}
 const UM_SEG = (cur) => seg([{ id: 'kategorien', label: 'Kategorien', href: '#/umsaetze' }, { id: 'berichte', label: 'Berichte', href: '#/umsaetze/berichte' }, { id: 'liste', label: 'Verlauf', href: '#/umsaetze/verlauf' }], cur, 'Ansicht');
 VIEWS.umsaetze = (r) => {
   const sub = r.a === 'berichte' ? 'berichte' : (r.a === 'verlauf' || r.a === 'liste') ? 'liste' : 'kategorien';       // Kategorien ist die Startseite der Übersicht
@@ -147,8 +155,7 @@ VIEWS.umsaetze = (r) => {
     <div class="todo-bar"><label class="search"><span class="sr">Umsätze durchsuchen</span>${icon('search')}<input type="search" id="q" data-fid="q" value="${esc(ui.q)}" placeholder="Suchen" autocomplete="off" enterkeyhint="search"></label>
       <div class="menu-wrap"><button type="button" class="icon-btn filter-btn" data-act="filter-toggle" aria-haspopup="menu" aria-expanded="${ui.filterOpen}" aria-controls="filter-menu" aria-label="Filter${nFilt ? `, ${nFilt} aktiv` : ''}">${icon('filter')}${nFilt ? `<span class="count" aria-hidden="true">${nFilt}</span>` : ''}</button>
         <div class="menu" id="filter-menu" role="menu" aria-label="Filter"${ui.filterOpen ? '' : ' hidden'}>
-          <div class="menu-group" role="group" aria-label="Art"><span class="menu-label">Art</span>${chips.map(([id, l]) => `<button type="button" class="menu-item" role="menuitemradio" aria-checked="${ui.filter === id}" data-act="filter" data-k="${id}"><span>${l}</span>${ui.filter === id ? icon('check') : ''}</button>`).join('')}</div>
-          ${accts.length > 1 ? `<div class="menu-group" role="group" aria-label="Konto"><span class="menu-label">Konto</span><button type="button" class="menu-item" role="menuitemradio" aria-checked="${!ui.acct}" data-act="acct" data-k=""><span>Alle Konten</span>${!ui.acct ? icon('check') : ''}</button>${accts.map((a) => `<button type="button" class="menu-item" role="menuitemradio" aria-checked="${ui.acct === a.id}" data-act="acct" data-k="${esc(a.id)}"><span>${esc(a.name)}</span>${ui.acct === a.id ? icon('check') : ''}</button>`).join('')}</div>` : ''}
+          ${filterMenuInner()}
         </div></div></div>
     <div id="txlist" data-live>${txListHtml()}</div></div>`;
 };
