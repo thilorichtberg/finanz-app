@@ -160,5 +160,10 @@ t('Wiederkehrend: Doppelbuchung (zwei Monate auf einmal) bricht die Erkennung ni
   const rec = Fin.detectRecurring([mk('2026-09-01', -29.9), mk('2026-10-01', -59.8), mk('2026-11-02', -29.9)]);
   assert.equal(rec.length, 1); assert.equal(rec[0].amount, -29.9); assert.equal(rec[0].name, 'Hommer Fitness GmbH');
 });
+t('Wiederkehrend: Nachzahlung über zwei Monate (43 €, dann 86 € nach zwei Monaten) wird als 43 € monatlich erkannt', () => {
+  const mk = (d, a) => ({ id: d, date: d, amount: a, name: 'Muenchner Verkehrsgesellschaft', purpose: 'MVG ABONNEMENT', cat: 'abos', label: 'MVG Abo' });
+  const rec = Fin.detectRecurring([mk('2026-09-01', -43), mk('2026-11-02', -86)]);
+  assert.equal(rec.length, 1); assert.equal(rec[0].amount, -43);
+});
 t('Nächste Fälligkeit kürzt auf Monatsende', () => { assert.equal(Fin.nextDue(31, '2026-02-10'), '2026-02-28'); assert.equal(Fin.nextDue(5, '2026-11-18'), '2026-12-05'); });
 console.log(`\n${ok} Tests bestanden`);

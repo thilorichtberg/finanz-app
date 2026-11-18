@@ -199,12 +199,12 @@
       const same = items.filter((i) => Math.sign(i.amount) === sign);
       if (same.length < minN) continue;
       const amts = same.map((i) => Math.abs(i.amount)).sort((a, b) => a - b);
-      const med = amts[Math.floor(amts.length / 2)];
+      const med = amts[Math.floor((amts.length - 1) / 2)];          // unterer Median: der Grundbetrag, nicht die Sammelbuchung
       const near = same.filter((i) => { const a = Math.abs(i.amount), k = Math.round(a / med); return Math.abs(a - med) <= Math.max(2, med * 0.2) || (k >= 2 && k <= 4 && Math.abs(a - k * med) <= Math.max(2, k * med * 0.05)); });   // auch Doppelbuchungen (zwei Monate auf einmal)
       if (near.length < minN) continue;
       const gaps = [];
-      for (let i = 1; i < near.length; i++) gaps.push((dparse(near[i].date) - dparse(near[i - 1].date)) / 864e5);
-      const monthly = gaps.filter((d) => d >= 24 && d <= 37).length;
+      for (let i = 1; i < near.length; i++) gaps.push({ d: (dparse(near[i].date) - dparse(near[i - 1].date)) / 864e5, k: Math.max(1, Math.round(Math.abs(near[i].amount) / med)) });
+      const monthly = gaps.filter((g) => (g.d >= 24 && g.d <= 37) || (g.k > 1 && g.d >= 24 * g.k && g.d <= 37 * g.k)).length;     // eine Buchung über k Monatsbeträge darf k Monate Abstand haben
       if (monthly < Math.max(minN - 1, Math.ceil(gaps.length * 0.6))) continue;
       const last = near[near.length - 1];
       const cp = /paypal/i.test(last.name || '') ? Fin.paypalMerchant(last.purpose) : (last.name || '').trim();      // echter Name statt allgemeiner Regelbezeichnung („Fitnessstudio" kann mehrere Studios meinen)
