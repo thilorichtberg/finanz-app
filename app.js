@@ -263,7 +263,35 @@ function placeIndicator() {
   ind.style.transform = `translate(${Math.round(r.left - bar.left + (r.width - w) / 2)}px, ${Math.round(r.top - bar.top + (r.height - h) / 2)}px)`;
   if (firstTab) { ind.classList.add('instant'); requestAnimationFrame(() => requestAnimationFrame(() => ind.classList.remove('instant'))); firstTab = false; }
 }
-window.addEventListener('resize', placeIndicator);
+window.addEventListener('resize', () => { placeIndicator(); placeSliders(true); });
+/* ---------- Umschalter (Monat | Woche | Tag, Kategorien | Berichte | Verlauf …): die Hinterlegung gleitet wie in der Reiterleiste (R7.17) ----------
+   Die Ansicht wird bei jedem Wechsel komplett neu gezeichnet. Deshalb merken wir uns pro Umschalter, wo die Hinterlegung zuletzt stand
+   (sliderPrev), setzen sie nach dem Zeichnen dorthin und lassen sie dann zum neuen Platz gleiten. Gemessen wird mit Layout-Maßen (offset*),
+   damit die Drück-Animation das Ergebnis nicht verfälscht. Markup: Container mit data-slider="<name>", der aktive Eintrag hat aria-current="page". */
+const sliderPrev = {};
+function placeSliders(instantAll) {
+  const seen = new Set(), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.querySelectorAll('[data-slider]').forEach((box) => {
+    const id = box.dataset.slider, cur = box.querySelector('[aria-current="page"]');
+    if (!cur || !cur.offsetWidth) return;
+    seen.add(id);
+    let ind = box.querySelector(':scope > .sl-ind');
+    if (!ind) { ind = document.createElement('span'); ind.className = 'sl-ind'; ind.setAttribute('aria-hidden', 'true'); box.prepend(ind); }
+    box.classList.add('has-ind');
+    const to = { x: cur.offsetLeft, y: cur.offsetTop, w: cur.offsetWidth, h: cur.offsetHeight };
+    const from = sliderPrev[id];
+    const set = (p) => { ind.style.width = `${p.w}px`; ind.style.height = `${p.h}px`; ind.style.transform = `translate(${p.x}px, ${p.y}px)`; };
+    const glide = !!from && !instantAll && !reduce && (from.x !== to.x || from.w !== to.w);
+    ind.classList.add('instant');
+    set(glide ? from : to);                                   // dort anfangen, wo die Hinterlegung beim letzten Zeichnen stand
+    void ind.offsetWidth;
+    ind.classList.remove('instant');
+    if (glide) set(to);                                       // und hinübergleiten
+    sliderPrev[id] = to;
+  });
+  Object.keys(sliderPrev).forEach((id) => { if (!seen.has(id)) delete sliderPrev[id]; });   // Umschalter nicht mehr sichtbar: beim nächsten Mal sofort platzieren
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => placeSliders(true));
 
 function parseRoute() {
   const h = (location.hash || '#/heute').replace(/^#\/?/, '').split('?')[0];
@@ -283,6 +311,7 @@ function render(opts = {}) {
   const tab = tabOf(r);
   $$('.tabbar a').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   placeIndicator();
+  placeSliders();                                             // Umschalter in der Ansicht: Hinterlegung gleitet
   const isNav = key !== lastRouteKey;
   if (isNav) {
     view.classList.remove('view-in'); void view.offsetWidth; view.classList.add('view-in');

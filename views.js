@@ -32,7 +32,7 @@ function pageHead(title, o = {}) {
   return `<div class="page-head ${o.left === false ? '' : 'left'}">${back}<div class="titles"><h1>${esc(title)}</h1>${o.sub ? `<p>${esc(o.sub)}</p>` : ''}</div>${o.actions ? `<div class="head-actions">${o.actions}</div>` : ''}</div>`;
 }
 function seg(items, cur, label) {
-  return `<nav class="seg ${items.length === 3 ? 'three' : ''}" aria-label="${esc(label)}">${items.map((i) => `<a href="${i.href}"${i.id === cur ? ' aria-current="page"' : ''}>${esc(i.label)}</a>`).join('')}</nav>`;
+  return `<nav class="seg ${items.length === 3 ? 'three' : ''}" data-slider="${esc(label)}" aria-label="${esc(label)}">${items.map((i) => `<a href="${i.href}"${i.id === cur ? ' aria-current="page"' : ''}>${esc(i.label)}</a>`).join('')}</nav>`;
 }
 function txRow(t, opt = {}) {
   const c = derived().cmap.get(t.cat) || catById(t.cat);
