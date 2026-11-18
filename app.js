@@ -242,17 +242,10 @@ window.addEventListener('hashchange', () => { if (drawer.open) drawer.close(); }
 drawer.addEventListener('close', () => $('#menu-btn').focus({ preventScroll: true }));
 
 /* ---------- Navigation: Hash-Routen, Tab-Leiste ---------- */
-/* Übergangsweise zwei Oberflächen: „alt“ (wie bisher) und „neu“ (Budget, Übersicht, andere Symbole). Der Schalter steht oben in der Mitte. */
-let uiMode = 'neu';
-try { const m = localStorage.getItem('finanz-ui'); if (m === 'alt' || m === 'neu') uiMode = m; } catch (e) { /* ohne Speicher: neu */ }
-const TABS_ALT = [
-  { id: 'heute', label: 'Heute', icon: 'today', href: '#/heute' },
-  { id: 'umsaetze', label: 'Umsätze', icon: 'list', href: '#/umsaetze' },
-  { id: 'neu', label: 'Neu', icon: 'plus', href: '#/neu', main: true },
-  { id: 'plan', label: 'Plan', icon: 'calendar', href: '#/plan' },
-  { id: 'einstellungen', label: 'Einstellungen', icon: 'gear', href: '#/einstellungen' },
-];
-const TABS_NEU = [
+/* Unten: Budget, Übersicht, Neu, Plan, Einstellungen (Symbole bewusst anders als bei Habits) */
+const uiMode = 'neu';
+try { localStorage.removeItem('finanz-ui'); } catch (e) { /* egal */ }       // Rest des früheren Alt/Neu-Schalters
+const TABS = [
   { id: 'heute', label: 'Budget', icon: 'wallet', href: '#/heute' },
   { id: 'umsaetze', label: 'Übersicht', icon: 'pie', href: '#/umsaetze' },
   { id: 'neu', label: 'Neu', icon: 'plus', href: '#/neu', main: true },
@@ -260,15 +253,8 @@ const TABS_NEU = [
   { id: 'einstellungen', label: 'Einstellungen', icon: 'sliders', href: '#/einstellungen' },
 ];
 let firstTab = true;
-function buildTabbar() {
-  const tabs = uiMode === 'neu' ? TABS_NEU : TABS_ALT;
-  $('#tabbar').innerHTML = `<div class="tabbar-in"><span class="tab-indicator" aria-hidden="true"></span>${tabs.map((t) =>
-    `<a href="${t.href}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}"${t.main ? ' class="tab-new"' : ''}><span class="ico">${t.main ? `<span class="plus">${icon('plus')}</span>` : icon(t.icon)}</span></a>`).join('')}</div>`;
-  firstTab = true;
-  $$('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === uiMode)));
-}
-buildTabbar();
-function setMode(m) { uiMode = m; try { localStorage.setItem('finanz-ui', m); } catch (e) { /* egal */ } buildTabbar(); render({ force: true }); announce(m === 'neu' ? 'Neue Ansicht' : 'Alte Ansicht'); }
+$('#tabbar').innerHTML = `<div class="tabbar-in"><span class="tab-indicator" aria-hidden="true"></span>${TABS.map((t) =>
+  `<a href="${t.href}" data-tab="${t.id}" aria-label="${t.label}" title="${t.label}"${t.main ? ' class="tab-new"' : ''}><span class="ico">${t.main ? `<span class="plus">${icon('plus')}</span>` : icon(t.icon)}</span></a>`).join('')}</div>`;
 function placeIndicator() {
   const ind = $('.tab-indicator'), cur = $('.tabbar a[aria-current="page"]'); if (!ind || !cur) return;
   const bar = $('.tabbar-in').getBoundingClientRect(), r = cur.getBoundingClientRect(), w = 60, h = 40;

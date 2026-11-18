@@ -95,10 +95,6 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
       await page.click('[data-act=warn-del]'); await page.waitForTimeout(100);
       if (await page.$('.warn-card [data-act=warn-hide]')) bad(`${tag} Gelöschte Warnung steht noch in der Liste`);
     } else bad(`${tag} keine Warnung zum Testen vorhanden`);
-    // Alt-Ansicht: Schalter oben in der Mitte, andere Symbole unten
-    await page.click('[data-mode=alt]'); await page.waitForTimeout(150);
-    for (const r of ['heute/tag', 'umsaetze', 'plan', 'plan/fix', 'einstellungen']) await nav('#/' + r, 'alt-' + r.replace('/', '-'));
-    await page.click('[data-mode=neu]'); await page.waitForTimeout(100);
     if (errs.length) bad(`${tag}: ${errs.join(' | ')}`);
     await ctx.close();
   }

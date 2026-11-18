@@ -90,7 +90,6 @@ document.addEventListener('click', (e) => {
   const sl = e.target.closest('.pie .slice');                 // Torte: Antippen zeigt den Namen der Kategorie
   if (sl) { pieSelect(sl); return; }
   if (e.target.closest('.pie svg')) { const sel = e.target.closest('.pie').querySelector('.slice.sel'); if (sel) pieSelect(sel); return; }
-  const mb = e.target.closest('[data-mode]'); if (mb) { if (mb.dataset.mode !== uiMode) setMode(mb.dataset.mode); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id, k = el.dataset.k;
   switch (act) {

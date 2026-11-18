@@ -463,9 +463,6 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
 
 #refresh-btn { margin-left: auto; }
-.mode-switch { position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 2px); transform: translateX(-50%); height: 44px; display: flex; align-items: stretch; gap: 0; padding: 0; background: var(--surface-2); border-radius: 999px; }
-.mode-switch button { min-width: 56px; height: 44px; padding: 0 var(--s3); border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-weight: 700; font-size: .875rem; transition: background-color var(--t-fast), color var(--t-fast); }
-.mode-switch button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 .topbar { justify-content: space-between; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #refresh-btn.spin .ic { animation: spin 900ms linear infinite; }
