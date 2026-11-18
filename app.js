@@ -327,7 +327,21 @@ function updateDot() {
   a.setAttribute('aria-label', n ? `Einstellungen, ${n} ${n === 1 ? 'Warnung' : 'Warnungen'}` : 'Einstellungen');
 }
 let draftKeep = false;                                       // beim Gang zur Beispiel-Auswahl und zurück bleibt der Entwurf des Formulars erhalten
-window.addEventListener('hashchange', () => { if (draftKeep) draftKeep = false; else draft = null; render(); });
+/* Verlauf: Der Zurück-Pfeil oben links führt immer zur Seite davor (wie die Zurück-Taste), nicht zu einer festen Oberseite.
+   Wir merken uns die besuchten Seiten selbst, um zu wissen, ob es ein „davor" in der App gibt. */
+let navStack = [location.hash || '#/heute'], navReplace = false;
+window.addEventListener('hashchange', () => {
+  const h = location.hash || '#/heute';
+  if (navReplace) { navStack[navStack.length - 1] = h; navReplace = false; }
+  else if (navStack.length > 1 && navStack[navStack.length - 2] === h) navStack.pop();       // zurück
+  else if (navStack[navStack.length - 1] !== h) navStack.push(h);
+  if (draftKeep) draftKeep = false; else draft = null;
+  render();
+});
+const goBack = (fallback) => { if (navStack.length > 1) history.back(); else go(fallback); };
+function replaceTo(target) { if (location.hash === target) { render({ force: true }); return; } navReplace = true; location.replace(location.pathname + location.search + target); }
+// Nach dem Speichern: ist die Seite davor schon das Ziel, geht es dorthin zurück; sonst ersetzt das Ziel die Formularseite im Verlauf
+function finishTo(target) { if (navStack.length > 1 && navStack[navStack.length - 2] === target) history.back(); else replaceTo(target); }
 const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
 
 /* ---------- Drück-Animation für jeden Knopf (R2.10) ---------- */

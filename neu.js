@@ -50,13 +50,12 @@ function pieHtml(parts) {
   const total = parts.reduce((s, x) => s + x.total, 0); if (total <= 0) return '';
   const cx = 100, cy = 100, R = 92, r = 56, pt = (rad, a) => `${(cx + rad * Math.cos(a)).toFixed(2)} ${(cy + rad * Math.sin(a)).toFixed(2)}`;
   let a0 = -Math.PI / 2;
-  const paths = parts.map((x) => {
-    const frac = x.total / total, a1 = a0 + Math.min(frac, 0.9999) * 2 * Math.PI, large = frac > 0.5 ? 1 : 0;
+  const paths = parts.map((x, i) => {
+    const frac = x.total / total, a1 = a0 + Math.min(frac, 0.9999) * 2 * Math.PI, large = frac > 0.5 ? 1 : 0, p = Math.round(frac * 100);
     const d = `M${pt(R, a0)} A${R} ${R} 0 ${large} 1 ${pt(R, a1)} L${pt(r, a1)} A${r} ${r} 0 ${large} 0 ${pt(r, a0)} Z`;
     a0 = a0 + frac * 2 * Math.PI;
-    return `<path d="${d}" fill="${x.color}" stroke="var(--bg)" stroke-width="2" stroke-linejoin="round"><title>${esc(x.name)}: ${eur(x.total)} (${Math.round(frac * 100)} %)</title></path>`;
+    return `<path class="slice" d="${d}" fill="${x.color}" stroke="var(--bg)" stroke-width="2" stroke-linejoin="round" tabindex="0" role="button" aria-pressed="false" aria-label="${esc(x.name)}, ${eur(x.total)}, ${p} Prozent" data-name="${esc(x.name)}" data-amt="${eur(x.total)}" data-pct="${p}"><title>${esc(x.name)}: ${eur(x.total)} (${p} %)</title></path>`;
   }).join('');
-  const label = parts.map((x) => `${x.name} ${Math.round((x.total / total) * 100)} Prozent`).join(', ');
-  return `<div class="pie"><svg viewBox="0 0 200 200" role="img" aria-label="Ausgaben nach Kategorie: ${esc(label)}">${paths}
-    <text x="100" y="97" text-anchor="middle" class="pie-total">${eur(total)}</text><text x="100" y="116" text-anchor="middle" class="pie-cap">Ausgaben</text></svg></div>`;
+  return `<div class="pie" data-total="${eur(total)}"><svg viewBox="0 0 200 200" role="group" aria-label="Ausgaben nach Kategorie, ein Stück antippen zeigt die Kategorie">${paths}</svg>
+    <div class="pie-center" aria-live="polite"><strong class="pc-main">${eur(total)}</strong><span class="pc-sub">Ausgaben</span></div></div>`;
 }

@@ -56,6 +56,18 @@ let fails = 0; const bad = (m) => { fails++; console.error('FAIL', m); };
     await nav('#/neu/geplant', 'form-geplant'); await page.fill('#f-name', 'Klarna'); await page.fill('#f-amount', '80'); await page.click('.gform [type=submit]'); await page.waitForSelector('.tx'); await check('plan-geplant');
     await nav('#/heute/tag', 'heute-mit-plan');
     const big = await page.textContent('.hero .big'); console.log(tag, 'Heute übrig:', big.trim());
+    // Torte: Antippen zeigt den Namen; Zurück-Verhalten (Übersicht → Kategorien → Kategorie → Umsatz → zurück / speichern)
+    await nav('#/umsaetze/kategorien', 'torte-start');
+    const sliceName = await page.getAttribute('.pie .slice', 'data-name'); await page.click('.pie .slice');
+    if ((await page.textContent('.pie .pc-main')).trim() !== sliceName) bad(`${tag} Torte zeigt den Namen nicht`);
+    await check('torte-gewaehlt'); await page.click('.pie .slice');
+    await page.click('a.catrow'); await page.waitForSelector('a.tx'); const catHash = await page.evaluate(() => location.hash);
+    await page.click('a.tx'); await page.waitForSelector('#tx-form'); await page.click('.page-head .back'); await page.waitForTimeout(150);
+    if ((await page.evaluate(() => location.hash)) !== catHash) bad(`${tag} Zurück führte nicht zur Kategorie-Seite`);
+    await page.click('a.tx'); await page.waitForSelector('#tx-form'); await page.click('#tx-form [type=submit]'); await page.waitForTimeout(250);
+    if ((await page.evaluate(() => location.hash)) !== catHash) bad(`${tag} Nach dem Speichern nicht zurück bei der Kategorie-Seite`);
+    await page.click('.page-head .back'); await page.waitForTimeout(150);
+    if (!(await page.evaluate(() => location.hash)).startsWith('#/umsaetze/kategorien')) bad(`${tag} Zurück von der Kategorie führte nicht zur Kategorien-Übersicht`);
     // Alt-Ansicht: Schalter oben in der Mitte, andere Symbole unten
     await page.click('[data-mode=alt]'); await page.waitForTimeout(150);
     for (const r of ['heute/tag', 'umsaetze', 'plan', 'plan/fix', 'einstellungen']) await nav('#/' + r, 'alt-' + r.replace('/', '-'));

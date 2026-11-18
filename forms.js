@@ -170,7 +170,7 @@ document.addEventListener('submit', (e) => {
   const { vals, errs } = readForm(form, def);
   if (Object.keys(errs).length) { showErrors(form, def, errs); return; }
   const btn = form.querySelector('[type="submit"]'); btn.disabled = true; btn.textContent = 'Speichern …';
-  const res = def.save(vals); draft = null; toast(res.msg); go(res.to);
+  const res = def.save(vals); draft = null; toast(res.msg); finishTo(res.to);
 });
 
 /* Zuordnung eines Umsatzes (Details-Seite) */
@@ -190,7 +190,7 @@ function submitTx(form) {
   btn.disabled = true; btn.textContent = 'Speichern …';
   t.ignore = ignore; put('tx', t);
   const n = rule ? derived().txs.filter((x) => x.rule === ruleId).length : 0;
-  toast(rule ? `Regel gespeichert, ${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} zugeordnet` : 'Gespeichert'); go('#/umsaetze');
+  toast(rule ? `Regel gespeichert, ${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} zugeordnet` : 'Gespeichert'); goBack('#/umsaetze');
 }
 
 /* ---------- Plan ---------- */

@@ -85,6 +85,11 @@ function armDelete(btn, run) {
 
 /* ---------- Klicks ---------- */
 document.addEventListener('click', (e) => {
+  const back = e.target.closest('.page-head .back');          // Zurück-Pfeil: zur Seite davor, die feste Adresse gilt nur als Ersatz
+  if (back && navStack.length > 1) { e.preventDefault(); history.back(); return; }
+  const sl = e.target.closest('.pie .slice');                 // Torte: Antippen zeigt den Namen der Kategorie
+  if (sl) { pieSelect(sl); return; }
+  if (e.target.closest('.pie svg')) { const sel = e.target.closest('.pie').querySelector('.slice.sel'); if (sel) pieSelect(sel); return; }
   const mb = e.target.closest('[data-mode]'); if (mb) { if (mb.dataset.mode !== uiMode) setMode(mb.dataset.mode); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id, k = el.dataset.k;
@@ -154,15 +159,25 @@ document.addEventListener('click', (e) => {
       const n = derived().txs.filter((x) => x.rule === rid).length;
       toast(`Regel gespeichert: ${n} ${n === 1 ? 'Umsatz' : 'Umsätze'} zugeordnet`, undefined, { label: 'Rückgängig', run: () => { remove('rule', rid); render({ force: true }); } }); render({ force: true }); break;
     }
-    case 'del-tx': armDelete(el, () => { remove('tx', id); toast('Umsatz gelöscht', undefined, { label: 'Wiederherstellen', run: () => { restore('tx', id); render({ force: true }); } }); go('#/umsaetze'); }); break;
+    case 'del-tx': armDelete(el, () => { remove('tx', id); toast('Umsatz gelöscht', undefined, { label: 'Wiederherstellen', run: () => { restore('tx', id); render({ force: true }); } }); goBack('#/umsaetze'); }); break;
     case 'del-item': armDelete(el, () => {
       const kind = el.dataset.k, back = el.dataset.back || '#/heute', it = S[kind][id], name = it ? (it.name || it.text || 'Eintrag') : 'Eintrag';
       remove(kind, id); draft = null;
-      toast(`„${name}“ gelöscht`, undefined, { label: 'Wiederherstellen', run: () => { restore(kind, id); render({ force: true }); } }); go(back);
+      toast(`„${name}“ gelöscht`, undefined, { label: 'Wiederherstellen', run: () => { restore(kind, id); render({ force: true }); } }); goBack(back);
     }); break;
   }
 });
 document.addEventListener('input', (e) => { if (e.target.id === 'pq') { ui.pq = e.target.value; $('#pklist').innerHTML = pickListHtml(); return; } if (e.target.id === 'q') { ui.q = e.target.value; ui.limit = 60; $('#txlist').innerHTML = txListHtml(); } });
+
+/* ---------- Torte: Kategorie antippen ---------- */
+function pieSelect(path) {
+  const pie = path.closest('.pie'), was = path.classList.contains('sel'), main = pie.querySelector('.pc-main'), sub = pie.querySelector('.pc-sub');
+  pie.querySelectorAll('.slice').forEach((p) => { p.classList.remove('sel'); p.setAttribute('aria-pressed', 'false'); });
+  if (was) { pie.classList.remove('has-sel'); main.textContent = pie.dataset.total; sub.textContent = 'Ausgaben'; return; }
+  path.classList.add('sel'); path.setAttribute('aria-pressed', 'true'); pie.classList.add('has-sel');
+  main.textContent = path.dataset.name; sub.textContent = `${path.dataset.amt} · ${path.dataset.pct} %`;
+}
+document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('slice')) { e.preventDefault(); pieSelect(e.target); } });
 
 /* ---------- Bank-Anbindung (Edge Function bank-sync) ---------- */
 function askSheet(title, text, label, run) {                 // Rückfrage ohne Gefahr: Hauptknopf in Akzentfarbe
