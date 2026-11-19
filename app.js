@@ -384,6 +384,10 @@ const go = (hash) => { if (location.hash === hash) render(); else location.hash 
 /* ---------- Drück-Animation für jeden Knopf (R2.10) ---------- */
 const PRESS = 'button, a[href], summary, .switch-row';
 const noMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* ---------- Kein Zoomen, kein Querformat ---------- */
+['gesturestart', 'gesturechange', 'gestureend'].forEach((t) => document.addEventListener(t, (e) => e.preventDefault()));   // iOS: Pinch-Zoom abfangen
+try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { /* geht nur in installierter App (Android) */ }); } catch (_) { /* egal */ }
+
 let press = null, lastPress = null;
 function pressTarget(t) { const el = t && t.closest && t.closest(PRESS); if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return null; return el; }
 function pressSelector(el) {

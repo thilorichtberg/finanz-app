@@ -17,6 +17,8 @@ Persönliche Finanz-App als **Progressive Web App**, gleiches Aussehen und gleic
 - **Berichte:** Monatsvergleich, Ausgaben nach Händler, Export als CSV
 - **Local-first:** Die App arbeitet immer lokal und gleicht angemeldet mit Supabase ab (pro Eintrag gewinnt die jüngere Änderung)
 
+Die App ist nur für das Hochformat gebaut und lässt sich nicht zoomen; im Querformat erscheint auf iOS ein Hinweis, in der installierten Android-App ist das Hochformat gesperrt.
+
 ## Oberfläche (Alt/Neu)
 
 Unten stehen, von links nach rechts: **Budget** (Zeitraum-Schalter, „Heute übrig“, alle Ein- und Ausgaben des Zeitraums), **Übersicht** (Liste, Kategorien mit Tortendiagramm, Berichte), **Neu**, **Plan** (Fixkosten zuerst) und **Einstellungen**. Fixkosten und Einkommen trägst du selbst ein (fester Monatsbetrag, optional mit Beispiel-Buchung zur Erkennung), es gibt keine automatische Erkennung wiederkehrender Zahlungen mehr, nur die Kategorien-Erkennung. Einstellungen → **Warnungen** sammelt Hinweise (Fixkosten dauerhaft über dem Betrag, Einkommen fehlt oder weicht ab, Kategorie-Budgets, ablaufende Bank-Freigabe); ein roter Punkt am Einstellungen-Symbol zeigt, dass etwas wartet.
